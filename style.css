@@ -192,8 +192,10 @@ a {
 
 .feature-highlight {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 2rem;
+  justify-items: center;
+  align-items: center;
   background: white;
   padding: 3rem;
   border-radius: 20px;
