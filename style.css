@@ -1,0 +1,87 @@
+:root {
+  --teal: #008080;
+  --dark: #111;
+  --light: #f7f7f7;
+}
+
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  color: var(--dark);
+  background-color: #fff;
+}
+
+a { text-decoration: none; }
+
+header {
+  background-color: var(--teal);
+  color: white;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+header h1 { font-size: 2.5rem; margin-bottom: 20px; }
+header p { font-size: 1.2rem; margin-bottom: 30px; }
+header .cta-btn {
+  background-color: white;
+  color: var(--teal);
+  padding: 15px 30px;
+  border-radius: 8px;
+  font-weight: bold;
+  transition: 0.3s;
+}
+header .cta-btn:hover { background-color: #e0e0e0; }
+
+section {
+  padding: 60px 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+section h2 {
+  font-size: 2rem;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 20px;
+}
+
+.card {
+  flex: 1 1 250px;
+  background-color: var(--light);
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  transition: transform 0.3s;
+}
+
+.card:hover { transform: translateY(-5px); }
+.card h3 { color: var(--teal); margin-bottom: 15px; }
+
+.final-cta {
+  background-color: var(--teal);
+  color: white;
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.final-cta .cta-btn {
+  background-color: white;
+  color: var(--teal);
+  padding: 15px 30px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+footer {
+  text-align: center;
+  padding: 30px 20px;
+  background-color: var(--light);
+  font-size: 0.9rem;
+}
