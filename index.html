@@ -7,27 +7,32 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen pb-20">
+<body class="bg-slate-950 text-slate-100 pb-24">
 
     <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
         <div class="max-w-4xl mx-auto flex justify-between items-center">
-            <h1 class="font-bold text-lg">YGO <span class="text-amber-500">Share</span></h1>
+            <h1 class="font-bold text-lg text-amber-500">YGO Share</h1>
             <select id="userSelect" onchange="changeUser(this.value)" class="bg-slate-800 text-sm p-1 rounded border border-slate-700"></select>
         </div>
     </header>
 
     <main class="max-w-4xl mx-auto p-4">
-        <!-- ESTOQUE -->
-        <section id="estoque">
-            <h2 class="text-xl font-bold mb-4">Estoque do Grupo</h2>
-            <div id="stockGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-        </section>
+        <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 mb-6">
+            <h2 class="text-sm font-bold mb-3">Adicionar Carta ao Estoque</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <input id="cName" placeholder="Nome da carta" class="bg-slate-950 p-2 rounded text-sm border border-slate-800">
+                <input id="cQty" type="number" placeholder="Quantidade" class="bg-slate-950 p-2 rounded text-sm border border-slate-800">
+                <input id="cDeck" placeholder="Nome do Deck" class="bg-slate-950 p-2 rounded text-sm border border-slate-800">
+                <button onclick="addCard()" class="md:col-span-3 bg-amber-600 font-bold py-2 rounded text-sm">Adicionar</button>
+            </div>
+        </div>
+
+        <div id="stockGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
     </main>
 
     <script>
-        // Estrutura de dados com suporte a Quantidade e Deck
         let db = JSON.parse(localStorage.getItem('ygo_db')) || {
-            users: [{id: 'u1', name: 'Duelista 1'}],
+            users: [{id: 'u1', name: 'Duelista 1'}, {id: 'u2', name: 'Duelista 2'}],
             cards: []
         };
         let currentUser = localStorage.getItem('ygo_user') || 'u1';
@@ -40,33 +45,50 @@
 
         function render() {
             const grid = document.getElementById('stockGrid');
+            const userSelect = document.getElementById('userSelect');
+            
+            userSelect.innerHTML = db.users.map(u => `<option value="${u.id}" ${u.id === currentUser ? 'selected' : ''}>${u.name}</option>`).join('');
+            
             grid.innerHTML = db.cards.map(c => `
                 <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
-                    <img src="${c.imageUrl}" class="w-full rounded mb-2">
-                    <h3 class="font-bold text-sm truncate">${c.name}</h3>
-                    <p class="text-xs text-slate-400">Deck: ${c.deckName || 'Nenhum'}</p>
-                    <p class="text-xs text-amber-500 font-bold">Qtd: ${c.totalOwned} | Comigo: ${c.totalOwned - (c.loanedToId ? 1 : 0)}</p>
-                    ${c.ownerId === currentUser ? `
-                        <button onclick="directLend('${c.id}')" class="w-full mt-2 bg-amber-600 text-xs py-1 rounded">Emprestar 1</button>
+                    <h3 class="font-bold text-sm">${c.name}</h3>
+                    <p class="text-[10px] text-slate-400">Deck: ${c.deckName}</p>
+                    <div class="mt-2 text-xs">
+                        <p>Total: <span class="text-white font-bold">${c.totalOwned}</span></p>
+                        <p>Disponíveis: <span class="text-emerald-400 font-bold">${c.totalOwned - (c.status === 'loaned' ? 1 : 0)}</span></p>
+                    </div>
+                    ${c.ownerId === currentUser && c.status !== 'loaned' ? `
+                        <button onclick="directLend('${c.id}')" class="w-full mt-2 bg-amber-600 text-[10px] py-1 rounded font-bold">Emprestar</button>
                     ` : ''}
+                    ${c.status === 'loaned' ? `<button onclick="returnCard('${c.id}')" class="w-full mt-2 bg-slate-700 text-[10px] py-1 rounded">Devolver</button>` : ''}
                 </div>
             `).join('');
-            lucide.createIcons();
         }
 
-        function directLend(cardId) {
-            const card = db.cards.find(c => c.id === cardId);
-            const borrower = prompt("ID do usuário para emprestar:");
-            if(borrower) {
-                card.status = 'loaned';
-                card.loanedToId = borrower;
-                save();
-            }
+        function addCard() {
+            const name = document.getElementById('cName').value;
+            const qty = parseInt(document.getElementById('cQty').value);
+            const deck = document.getElementById('cDeck').value;
+            if(!name || !qty) return alert("Preencha nome e quantidade");
+            
+            db.cards.push({ id: 'c'+Date.now(), name, totalOwned: qty, deckName: deck, ownerId: currentUser, status: 'available' });
+            save();
+        }
+
+        function directLend(id) {
+            const card = db.cards.find(c => c.id === id);
+            card.status = 'loaned';
+            save();
+        }
+
+        function returnCard(id) {
+            const card = db.cards.find(c => c.id === id);
+            card.status = 'available';
+            save();
         }
 
         function changeUser(uid) { currentUser = uid; save(); }
 
-        // Inicialização
         render();
     </script>
 </body>
