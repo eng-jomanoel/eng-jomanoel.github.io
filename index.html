@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YGO Share - Gerenciador de Empréstimos</title>
+    <!-- Tailwind CSS for modern, fast styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons for beautiful modern icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ygo: {
+                            gold: '#D4AF37',
+                            darkgold: '#AA7C11',
+                            dark: '#0B0F19',
+                            card: '#1E293B',
+                            accent: '#F59E0B'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar styling for a premium feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D4AF37;
+        }
+        /* Mobile-first bottom nav fix */
+        body {
+            padding-bottom: 76px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased">
+
+    <!-- Header / Selector de Usuário Ativo -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-4 py-3 shadow-lg">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <div class="bg-gradient-to-r from-amber-500 to-yellow-600 p-1.5 rounded-lg shadow-md">
+                    <i data-lucide="swords" class="w-6 h-6 text-slate-950"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-1">
+                        YGO <span class="text-amber-400">Share</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Gerenciador do Grupo</p>
+                </div>
+            </div>
+            
+            <!-- Quick Active User Selector -->
+            <div class="flex items-center space-x-2">
+                <span class="text-xs text-slate-400 hidden sm:inline">Quem é você?</span>
+                <select id="activeUserSelect" onchange="changeActiveUser(this.value)" class="bg-slate-800 border border-slate-700 text-sm rounded-lg focus:ring-amber-500 focus:border-amber-500 block px-2.5 py-1.5 text-amber-400 font-medium">
+                    <!-- Dynamic Users -->
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-4xl mx-auto p-4">
+        
+        <!-- ================= TAB 1: ESTOQUE (HOME) ================= -->
+        <section id="tab-estoque" class="tab-content">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="library" class="text-amber-400"></i> Estoque do Grupo
+                    </h2>
+                    <p class="text-sm text-slate-400">Todas as cartas disponíveis para empréstimo.</p>
+                </div>
+                
+                <!-- Filters -->
+                <div class="flex gap-2">
+                    <input type="text" id="searchStockInput" oninput="renderStock()" placeholder="Pesquisar..." class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500 w-full sm:w-64">
+                    <select id="statusFilter" onchange="renderStock()" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-amber-500">
+                        <option value="all">Todas</option>
+                        <option value="available">Disponíveis</option>
+                        <option value="loaned">Emprestadas</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Stock Grid -->
+            <div id="stockGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <!-- Rendered dynamically -->
+            </div>
+            <div id="emptyStockMessage" class="hidden text-center py-12 text-slate-500">
+                <i data-lucide="search-code" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                <p>Nenhuma carta encontrada com esses filtros.</p>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: MINHA PASTA (ADD/MANAGE OWN CARDS) ================= -->
+        <section id="tab-pasta" class="tab-content hidden">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i data-lucide="folder-heart" class="text-amber-400"></i> Minha Pasta Virtual
+                </h2>
+                <p class="text-sm text-slate-400">Adicione cartas que você possui para que seus amigos possam requisitá-las.</p>
+            </div>
+
+            <!-- Search Live API Card Section -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6 shadow-md">
+                <h3 class="text-sm font-semibold text-amber-400 uppercase tracking-wider mb-3">Adicionar Cartas ao seu Estoque</h3>
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
+                        <input type="text" id="apiSearchInput" placeholder="Digite o nome da carta (inglês)..." class="bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 w-full text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500">
+                    </div>
+                    <button onclick="searchYGOCards()" class="bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm hover:from-amber-400 hover:to-yellow-500 transition-all flex items-center gap-1">
+                        <span>Buscar</span>
+                    </button>
+                </div>
+                
+                <!-- API Search Results -->
+                <div id="apiResultsContainer" class="hidden mt-4 pt-4 border-t border-slate-800">
+                    <h4 class="text-xs font-semibold text-slate-400 mb-3">Resultados encontrados:</h4>
+                    <div id="apiResultsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto p-1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Inventory List -->
+            <div>
+                <h3 class="text-md font-bold text-white mb-3">Minhas Cartas no Estoque (<span id="myCardsCount">0</span>)</h3>
+                <div id="myInventoryGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: EMPRÉSTIMOS & SOLICITAÇÕES ================= -->
+        <section id="tab-emprestimos" class="tab-content hidden">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i data-lucide="arrow-left-right" class="text-amber-400"></i> Painel de Empréstimos
+                </h2>
+                <p class="text-sm text-slate-400">Acompanhe solicitações, devoluções e tempo de uso.</p>
+            </div>
+
+            <!-- Section 1: Pendentes -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6 shadow-md">
+                <h3 class="text-sm font-semibold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    Solicitações para mim (<span id="pendingRequestsCount">0</span>)
+                </h3>
+                <div id="pendingRequestsList" class="space-y-3">
+                </div>
+            </div>
+
+            <!-- Section 2: Cartas Comigo -->
+            <div class="mb-6">
+                <h3 class="text-md font-bold text-white mb-3 flex items-center gap-2">
+                    <i data-lucide="user-check" class="text-emerald-400 w-5 h-5"></i> Cartas Comigo (<span id="borrowedCount">0</span>)
+                </h3>
+                <div id="borrowedCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                </div>
+            </div>
+
+            <!-- Section 3: Minhas Cartas Emprestadas -->
+            <div>
+                <h3 class="text-md font-bold text-white mb-3 flex items-center gap-2">
+                    <i data-lucide="external-link" class="text-sky-400 w-5 h-5"></i> Minhas Cartas Emprestadas (<span id="lentCount">0</span>)
+                </h3>
+                <div id="lentCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 4: PARTICIPANTES ================= -->
+        <section id="tab-participantes" class="tab-content hidden">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i data-lucide="users" class="text-amber-400"></i> Participantes
+                </h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md h-fit">
+                    <h3 class="text-sm font-semibold text-amber-400 uppercase tracking-wider mb-3">Adicionar Participante</h3>
+                    <div class="space-y-3">
+                        <input type="text" id="newUserName" placeholder="Nome do duelista" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 w-full text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+                        <button onclick="addNewUser()" class="w-full bg-slate-800 text-amber-400 font-semibold py-2 rounded-lg text-sm hover:bg-slate-700 transition-all">
+                            Adicionar
+                        </button>
+                    </div>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md">
+                        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Lista de Membros</h3>
+                        <div id="usersList" class="divide-y divide-slate-800">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 py-2 px-4 shadow-2xl z-50">
+        <div class="max-w-md mx-auto flex justify-between items-center text-center">
+            <button onclick="switchTab('estoque')" id="nav-estoque" class="nav-btn flex-1 flex flex-col items-center justify-center text-amber-500 font-medium">
+                <i data-lucide="library" class="w-5 h-5 mb-1"></i><span class="text-[10px]">Estoque</span>
+            </button>
+            <button onclick="switchTab('pasta')" id="nav-pasta" class="nav-btn flex-1 flex flex-col items-center justify-center text-slate-400">
+                <i data-lucide="folder-heart" class="w-5 h-5 mb-1"></i><span class="text-[10px]">Minha Pasta</span>
+            </button>
+            <button onclick="switchTab('emprestimos')" id="nav-emprestimos" class="nav-btn flex-1 flex flex-col items-center justify-center text-slate-400 relative">
+                <i data-lucide="arrow-left-right" class="w-5 h-5 mb-1"></i><span class="text-[10px]">Painel</span>
+                <span id="nav-loans-badge" class="hidden absolute top-0 right-6 bg-amber-500 text-slate-950 text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
+            </button>
+            <button onclick="switchTab('participantes')" id="nav-participantes" class="nav-btn flex-1 flex flex-col items-center justify-center text-slate-400">
+                <i data-lucide="users" class="w-5 h-5 mb-1"></i><span class="text-[10px]">Membros</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- CARD DETAIL MODAL -->
+    <div id="cardModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl relative">
+            <button onclick="closeCardModal()" class="absolute top-3 right-3 bg-black/60 text-slate-300 hover:text-white p-1 rounded-full z-10">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div id="modalContent" class="p-5 flex flex-col items-center text-center"></div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 font-bold px-4 py-2 rounded-lg shadow-lg z-50 text-sm hidden transition-all duration-300">
+        Operação concluída!
+    </div>
+
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        const defaultData = {
+            users: [
+                { id: "u1", name: "Yugi Muto" },
+                { id: "u2", name: "Seto Kaiba" },
+                { id: "u3", name: "Joey Wheeler" }
+            ],
+            cards: [],
+            requests: []
+        };
+
+        let db = JSON.parse(localStorage.getItem('ygo_loan_db')) || defaultData;
+        let currentUser = localStorage.getItem('ygo_active_user') || db.users[0]?.id || "";
+
+        function saveDB() {
+            localStorage.setItem('ygo_loan_db', JSON.stringify(db));
+            localStorage.setItem('ygo_active_user', currentUser);
+            lucide.createIcons();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!currentUser && db.users.length > 0) currentUser = db.users[0].id;
+            populateUserDropdown();
+            renderAll();
+            lucide.createIcons();
+        });
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2500);
+        }
+
+        function populateUserDropdown() {
+            const select = document.getElementById('activeUserSelect');
+            select.innerHTML = db.users.map(u => 
+                `<option value="${u.id}" ${u.id === currentUser ? 'selected' : ''}>${u.name}</option>`
+            ).join('');
+        }
+
+        function changeActiveUser(userId) {
+            currentUser = userId;
+            saveDB();
+            renderAll();
+            showToast(`Perfil alterado para: ${db.users.find(u => u.id === userId)?.name}`);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-amber-500', 'font-medium');
+                btn.classList.add('text-slate-400');
+            });
+            document.getElementById(`nav-${tabId}`).classList.remove('text-slate-400');
+            document.getElementById(`nav-${tabId}`).classList.add('text-amber-500', 'font-medium');
+            if (tabId === 'estoque') renderStock();
+            if (tabId === 'pasta') renderMyBinder();
+            if (tabId === 'emprestimos') renderLoansPanel();
+            if (tabId === 'participantes') renderParticipants();
+        }
+
+        function getDaysDiff(dateString) {
+            if (!dateString) return 0;
+            const past = new Date(dateString);
+            const today = new Date();
+            const diffTime = Math.abs(today - past);
+            return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function renderAll() {
+            renderStock();
+            renderMyBinder();
+            renderLoansPanel();
+            renderParticipants();
+        }
+
+        function renderStock() {
+            const grid = document.getElementById('stockGrid');
+            const emptyMsg = document.getElementById('emptyStockMessage');
+            const search = document.getElementById('searchStockInput').value.toLowerCase();
+            const filter = document.getElementById('statusFilter').value;
+
+            let filtered = db.cards.filter(c => {
+                const matchesSearch = c.name.toLowerCase().includes(search);
+                if (filter === 'available') return matchesSearch && c.status === 'available';
+                if (filter === 'loaned') return matchesSearch && c.status === 'loaned';
+                return matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '';
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+            emptyMsg.classList.add('hidden');
+
+            grid.innerHTML = filtered.map(c => {
+                const ownerName = db.users.find(u => u.id === c.ownerId)?.name || 'Desconhecido';
+                const statusBadge = c.status === 'available' 
+                    ? `<span class="bg-emerald-500/10 text-emerald-400 text-xs px-2 py-0.5 rounded-full font-semibold border border-emerald-500/20">Disponível</span>`
+                    : `<span class="bg-amber-500/10 text-amber-400 text-xs px-2 py-0.5 rounded-full font-semibold border border-amber-500/20">Emprestado</span>`;
+
+                const days = c.status === 'loaned' ? getDaysDiff(c.loanDate) : 0;
+                const loanText = c.status === 'loaned'
+                    ? `<p class="text-xs text-amber-500 font-medium mt-1">Com ${db.users.find(u => u.id === c.loanedToId)?.name || 'Alguém'} há ${days} dia(s)</p>`
+                    : `<p class="text-xs text-emerald-500 mt-1">Dono: ${ownerName}</p>`;
+
+                let button = '';
+                if (c.status === 'available') {
+                    if (c.ownerId === currentUser) {
+                        const otherUsers = db.users.filter(u => u.id !== currentUser);
+                        const userOptions = otherUsers.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+                        button = `
+                            <div class="mt-2 flex gap-1">
+                                <select id="direct_lend_${c.id}" class="flex-1 bg-slate-950 text-slate-300 text-xs py-1.5 px-1 rounded border border-slate-700 focus:border-amber-500 focus:outline-none">
+                                    <option value="" disabled selected>Passar para...</option>
+                                    ${userOptions}
+                                </select>
+                                <button onclick="directLendCard('${c.id}')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-2 rounded text-xs font-bold flex items-center justify-center transition-colors">
+                                    OK
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        const alreadyRequested = db.requests.some(r => r.cardId === c.id && r.requesterId === currentUser && r.status === 'pending');
+                        if (alreadyRequested) {
+                            button = `<button class="w-full mt-2 bg-slate-800 text-slate-400 font-medium text-xs py-1.5 rounded cursor-not-allowed" disabled>Aguardando aprovação</button>`;
+                        } else {
+                            button = `<button onclick="requestCard('${c.id}')" class="w-full mt-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-slate-950 transition-all font-semibold text-xs py-1.5 rounded border border-amber-500/30">Pedir Emprestado</button>`;
+                        }
+                    }
+                } else if (c.status === 'loaned') {
+                    if (c.ownerId === currentUser) {
+                        button = `<button onclick="returnCard('${c.id}')" class="w-full mt-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs py-1.5 rounded">Confirmar Devolução</button>`;
+                    } else if (c.loanedToId === currentUser) {
+                        button = `<span class="text-xs text-emerald-400 mt-2 block text-center font-medium">Está com você</span>`;
+                    } else {
+                        button = `<span class="text-xs text-slate-500 mt-2 block text-center italic">Indisponível</span>`;
+                    }
+                }
+
+                return `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow-md group">
+                        <div class="cursor-pointer" onclick="openCardModal('${c.apiId}', '${c.id}')">
+                            <div class="aspect-[71/103] rounded-lg overflow-hidden bg-slate-950 mb-2 relative">
+                                <img src="${c.imageUrl}" alt="${c.name}" class="w-full h-full object-cover">
+                                <div class="absolute top-2 right-2">${statusBadge}</div>
+                            </div>
+                            <h3 class="font-bold text-sm text-white truncate">${c.name}</h3>
+                            ${loanText}
+                        </div>
+                        ${button}
+                    </div>
+                `;
+            }).join('');
+            updateLoansBadge();
+        }
+
+        function renderMyBinder() {
+            const grid = document.getElementById('myInventoryGrid');
+            const myCards = db.cards.filter(c => c.ownerId === currentUser);
+            document.getElementById('myCardsCount').textContent = myCards.length;
+
+            if (myCards.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-8 text-slate-500">Sua pasta está vazia.</div>`;
+                return;
+            }
+
+            grid.innerHTML = myCards.map(c => {
+                const statusBadge = c.status === 'available' 
+                    ? `<span class="bg-emerald-500/10 text-emerald-400 text-xs px-2 py-0.5 rounded-full font-semibold">Disponível</span>`
+                    : `<span class="bg-amber-500/10 text-amber-400 text-xs px-2 py-0.5 rounded-full font-semibold">Emprestada</span>`;
+
+                return `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow-sm">
+                        <div>
+                            <div class="aspect-[71/103] rounded-lg overflow-hidden bg-slate-950 mb-2">
+                                <img src="${c.imageUrl}" alt="${c.name}" class="w-full h-full object-cover">
+                            </div>
+                            <h4 class="font-bold text-sm text-white truncate">${c.name}</h4>
+                            <div class="mt-2">${statusBadge}</div>
+                        </div>
+                        <button onclick="removeMyCard('${c.id}')" class="w-full mt-3 text-red-400 border border-red-500/20 text-xs py-1.5 rounded">Excluir Carta</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLoansPanel() {
+            const pendingList = document.getElementById('pendingRequestsList');
+            const myCardIds = db.cards.filter(c => c.ownerId === currentUser).map(c => c.id);
+            const myPendingRequests = db.requests.filter(r => r.status === 'pending' && myCardIds.includes(r.cardId));
+            document.getElementById('pendingRequestsCount').textContent = myPendingRequests.length;
+
+            if (myPendingRequests.length === 0) {
+                pendingList.innerHTML = `<p class="text-sm text-slate-500 text-center py-4">Nenhuma solicitação pendente.</p>`;
+            } else {
+                pendingList.innerHTML = myPendingRequests.map(r => {
+                    const card = db.cards.find(c => c.id === r.cardId);
+                    const requester = db.users.find(u => u.id === r.requesterId);
+                    return `
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
+                            <div class="flex items-center space-x-3">
+                                <img src="${card?.imageUrl}" alt="${card?.name}" class="w-12 h-18 rounded border border-slate-800">
+                                <div>
+                                    <h4 class="font-bold text-sm text-white">${card?.name}</h4>
+                                    <p class="text-xs text-amber-400">De: ${requester?.name}</p>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="respondRequest('${r.id}', 'rejected')" class="bg-slate-800 text-slate-300 px-3 py-1.5 rounded text-xs">Recusar</button>
+                                <button onclick="respondRequest('${r.id}', 'approved')" class="bg-emerald-500 text-slate-950 px-4 py-1.5 rounded text-xs font-bold">Emprestar</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const borrowedGrid = document.getElementById('borrowedCardsGrid');
+            const borrowedCards = db.cards.filter(c => c.status === 'loaned' && c.loanedToId === currentUser);
+            document.getElementById('borrowedCount').textContent = borrowedCards.length;
+            
+            borrowedGrid.innerHTML = borrowedCards.map(c => {
+                const owner = db.users.find(u => u.id === c.ownerId);
+                return `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center space-x-3">
+                        <img src="${c.imageUrl}" alt="${c.name}" class="w-14 h-20 rounded border border-slate-800">
+                        <div>
+                            <h4 class="font-bold text-sm text-white">${c.name}</h4>
+                            <p class="text-xs text-slate-400">Dono: ${owner?.name}</p>
+                            <p class="text-xs text-emerald-400">Comigo há ${getDaysDiff(c.loanDate)} dia(s)</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const lentGrid = document.getElementById('lentCardsGrid');
+            const lentCards = db.cards.filter(c => c.status === 'loaned' && c.ownerId === currentUser);
+            document.getElementById('lentCount').textContent = lentCards.length;
+
+            lentGrid.innerHTML = lentCards.map(c => {
+                const borrower = db.users.find(u => u.id === c.loanedToId);
+                return `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <img src="${c.imageUrl}" alt="${c.name}" class="w-14 h-20 rounded border border-slate-800">
+                            <div>
+                                <h4 class="font-bold text-sm text-white">${c.name}</h4>
+                                <p class="text-xs text-slate-400">Com: ${borrower?.name}</p>
+                                <p class="text-xs text-amber-500">Há ${getDaysDiff(c.loanDate)} dia(s)</p>
+                            </div>
+                        </div>
+                        <button onclick="returnCard('${c.id}')" class="bg-emerald-500 text-slate-950 px-2 py-1.5 rounded text-[10px] font-bold">Devolvida</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderParticipants() {
+            const list = document.getElementById('usersList');
+            list.innerHTML = db.users.map(u => {
+                const totalCards = db.cards.filter(c => c.ownerId === u.id).length;
+                return `
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center font-bold text-amber-400">${u.name.substring(0,2).toUpperCase()}</div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-white">${u.name}</h4>
+                                <p class="text-xs text-slate-500">Cartas no estoque: ${totalCards}</p>
+                            </div>
+                        </div>
+                        ${db.users.length > 1 ? `<button onclick="deleteUser('${u.id}')" class="text-red-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        async function searchYGOCards() {
+            const query = document.getElementById('apiSearchInput').value.trim();
+            const resultsGrid = document.getElementById('apiResultsGrid');
+            const resultsContainer = document.getElementById('apiResultsContainer');
+
+            if (query.length < 3) return showToast("Digite pelo menos 3 letras.");
+            
+            resultsGrid.innerHTML = `<p class="col-span-full py-4 text-center text-amber-500">Buscando...</p>`;
+            resultsContainer.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                if (!data.data || data.data.length === 0) {
+                    resultsGrid.innerHTML = `<p class="col-span-full py-4 text-center text-slate-500">Nenhuma carta encontrada.</p>`;
+                    return;
+                }
+
+                resultsGrid.innerHTML = data.data.slice(0, 12).map(c => `
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <img src="${c.card_images[0].image_url}" class="w-full h-auto rounded mb-2 object-cover aspect-[71/103]">
+                        <h5 class="text-[10px] font-bold text-white truncate mb-2">${c.name}</h5>
+                        <button onclick="addCardToStock('${c.id}', '${c.name.replace(/'/g, "\'")}', '${c.card_images[0].image_url}')" class="w-full bg-amber-500 text-slate-950 font-bold text-[10px] py-1 rounded">+ Estoque</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                resultsGrid.innerHTML = `<p class="col-span-full py-4 text-center text-red-400">Erro na busca.</p>`;
+            }
+        }
+
+        function addCardToStock(apiId, name, imageUrl) {
+            db.cards.push({ id: 'c_' + Date.now(), apiId, name, imageUrl, ownerId: currentUser, status: 'available', loanedToId: null, loanDate: null });
+            saveDB(); renderMyBinder(); showToast("Carta adicionada!");
+        }
+
+        function removeMyCard(cardId) {
+            if(db.cards.find(c => c.id === cardId)?.status === 'loaned' && !confirm("Carta emprestada! Remover?")) return;
+            db.requests = db.requests.filter(r => r.cardId !== cardId);
+            db.cards = db.cards.filter(c => c.id !== cardId);
+            saveDB(); renderAll(); showToast("Carta removida!");
+        }
+
+        function requestCard(cardId) {
+            if (db.requests.some(r => r.cardId === cardId && r.requesterId === currentUser && r.status === 'pending')) return;
+            db.requests.push({ id: 'r_' + Date.now(), cardId, requesterId: currentUser, requestedDate: new Date().toISOString(), status: 'pending' });
+            saveDB(); renderStock(); showToast("Solicitação enviada!");
+        }
+
+        function respondRequest(requestId, newStatus) {
+            const req = db.requests.find(r => r.id === requestId);
+            const card = db.cards.find(c => c.id === req?.cardId);
+            if (newStatus === 'approved') {
+                card.status = 'loaned'; card.loanedToId = req.requesterId; card.loanDate = new Date().toISOString();
+                db.requests = db.requests.filter(r => r.cardId !== card.id);
+                showToast("Emprestado!");
+            } else {
+                db.requests = db.requests.filter(r => r.id !== requestId);
+                showToast("Recusado.");
+            }
+            saveDB(); renderAll();
+        }
+
+        function returnCard(cardId) {
+            const card = db.cards.find(c => c.id === cardId);
+            card.status = 'available'; card.loanedToId = null; card.loanDate = null;
+            saveDB(); renderAll(); showToast("Carta devolvida!");
+        }
+
+        function directLendCard(cardId) {
+            const selectEl = document.getElementById(`direct_lend_${cardId}`);
+            if (!selectEl || !selectEl.value) {
+                showToast("Selecione um duelista primeiro!");
+                return;
+            }
+            const card = db.cards.find(c => c.id === cardId);
+            card.status = 'loaned'; card.loanedToId = selectEl.value; card.loanDate = new Date().toISOString();
+            db.requests = db.requests.filter(r => r.cardId !== card.id);
+            saveDB(); renderAll(); showToast("Carta entregue diretamente!");
+        }
+
+        function addNewUser() {
+            const name = document.getElementById('newUserName').value.trim();
+            if (!name) return;
+            db.users.push({ id: 'u_' + Date.now(), name });
+            document.getElementById('newUserName').value = '';
+            saveDB(); populateUserDropdown(); renderAll(); showToast("Adicionado!");
+        }
+
+        function deleteUser(userId) {
+            if (!confirm("Remover usuário e seus dados?")) return;
+            db.cards = db.cards.filter(c => c.ownerId !== userId);
+            db.cards.forEach(c => { if(c.loanedToId === userId) { c.status = 'available'; c.loanedToId = null; } });
+            db.requests = db.requests.filter(r => r.requesterId !== userId);
+            db.users = db.users.filter(u => u.id !== userId);
+            if(currentUser === userId) currentUser = db.users[0]?.id;
+            saveDB(); populateUserDropdown(); renderAll();
+        }
+
+        function updateLoansBadge() {
+            const myCardIds = db.cards.filter(c => c.ownerId === currentUser).map(c => c.id);
+            const count = db.requests.filter(r => r.status === 'pending' && myCardIds.includes(r.cardId)).length;
+            const badge = document.getElementById('nav-loans-badge');
+            count > 0 ? (badge.textContent = count, badge.classList.remove('hidden')) : badge.classList.add('hidden');
+        }
+
+        async function openCardModal(apiId, localId) {
+            const modal = document.getElementById('cardModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            content.innerHTML = `<div class="animate-spin rounded-full h-8 w-8 border-4 border-amber-500 border-t-transparent my-12"></div>`;
+            try {
+                const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${apiId}`);
+                const data = await res.json();
+                const card = data.data[0];
+                content.innerHTML = `
+                    <div class="w-40 aspect-[71/103] bg-slate-950 rounded-lg overflow-hidden shadow-lg mb-4">
+                        <img src="${card.card_images[0].image_url}" class="w-full h-full object-cover">
+                    </div>
+                    <h3 class="font-bold text-lg text-white mb-1">${card.name}</h3>
+                    <p class="text-xs text-slate-400 text-left max-h-32 overflow-y-auto px-2 mb-3 bg-slate-950/50 p-2 rounded border border-slate-800">${card.desc}</p>
+                `;
+            } catch (e) {
+                content.innerHTML = `<p class="text-red-400 py-6">Erro ao carregar detalhes.</p>`;
+            }
+        }
+        function closeCardModal() { document.getElementById('cardModal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
