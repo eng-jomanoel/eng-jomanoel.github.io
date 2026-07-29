@@ -137,13 +137,7 @@ h1 {
     }
 }
 
-/* DASHBOARD */
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
-}
-
+/* CARDS E GRID */
 .kpi-card {
     background: var(--surface);
     border: 1px solid var(--line);
@@ -152,23 +146,16 @@ h1 {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
 }
 
-.kpi-card span {
-    font-size: 10px;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    font-weight: 600;
+.production-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
 }
 
-.kpi-card h2 {
-    margin: 4px 0 0;
-    font-size: 22px;
-    font-family: 'IBM Plex Mono', monospace;
-    color: var(--steel-dark);
-}
-
-.kpi-highlight {
-    border-left: 4px solid var(--amber-deep);
-    background: #FFF9E6;
+@media(min-width: 650px) {
+    .production-cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
 }
 
 .btn-avulso {
@@ -182,50 +169,20 @@ h1 {
     font-size: 12px;
 }
 
-/* DIAGRAMAS 5S */
-.diagram-5s-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    align-items: start;
-}
-
-@media(max-width: 700px) {
-    .diagram-5s-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.zone-card {
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
+/* BOX DE AVISO (WARNING) */
+.warning-box {
+    background: #fffbe0;
+    border: 1px solid #fef08a;
+    border-left: 4px solid #eab308;
+    color: #854d0e;
     padding: 10px;
-    min-height: 250px;
+    border-radius: 6px;
+    font-size: 11px;
+    margin-top: 14px;
+    line-height: 1.4;
 }
 
-.zone-card h4 {
-    margin: 0 0 10px 0;
-    font-size: 13px;
-    border-bottom: 1px solid #cbd5e1;
-    padding-bottom: 6px;
-    color: var(--steel-dark);
-}
-
-/* CARDS */
-.production-cards-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
-}
-
-@media(min-width: 650px) {
-    .production-cards-grid {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    }
-}
-
-/* MODAL MOBILE OPTIMIZED (Evita zoom automatico no iOS com font-size 16px) */
+/* MODAL */
 .modal {
     display: none;
     position: fixed;
@@ -280,9 +237,4 @@ h1 {
     font-family: 'IBM Plex Sans', sans-serif;
     outline: none;
     margin-top: 6px;
-}
-
-.modal-select:focus {
-    border-color: #2563eb;
-    background: #fff;
 }
