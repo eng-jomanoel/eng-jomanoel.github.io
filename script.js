@@ -16,8 +16,9 @@ function getEstiloTagCor(cor) {
     return mapaCores[cor] || "background: #94a3b8; color: #ffffff;";
 }
 
+// Armazena estado dos checks e dropdowns
 window.pedidosAbertos = window.pedidosAbertos || {};
-window.detalhesAbertos = window.detalhesAbertos || {};
+window.checksConcluidos = window.checksConcluidos || {};
 
 document.addEventListener("DOMContentLoaded", () => {
     setupNavigation();
@@ -41,10 +42,6 @@ function setupNavigation() {
             if (targetPage) {
                 targetPage.classList.add("active");
             }
-            
-            if (btn.dataset.page === "pageQrScanner") {
-                popularSimuladorQr();
-            }
         });
     });
 }
@@ -61,23 +58,34 @@ function setupSearch() {
     }
 }
 
+// Função auxiliar para calcular componentes com base na Largura e Altura
+function calcularComponentes(p) {
+    const larg = p.largura ? p.largura.toFixed(2) : "3.00";
+    const alt = p.altura ? p.altura.toFixed(2) : "2.50";
+    const qtdLaminas = Math.ceil((p.altura || 2.50) * 11); // ~11 lâminas por metro de altura
+
+    return {
+        dimensao: `${larg}m (largura) x ${alt}m (altura)`,
+        laminas: `${qtdLaminas}x Lâminas Meia Cana (#22) — Corde/Comp: ${larg}m`,
+        guia: `2x Guias Laterais U — Altura/Comp: ${alt}m`,
+        soleira: `1x Soleira de Reforço — Corde/Comp: ${larg}m`,
+        eixo: `1x Eixo Tubo Industrial — Corde/Comp: ${larg}m`
+    };
+}
+
 /* ==========================================================
-   1. PRODUÇÃO (SUPORTA BUSCA POR COMPONENTES E SANFONA)
+   1. PRODUÇÃO (EXIBE TAMANHOS DE LÂMINA, GUIA, SOLEIRA E EIXO)
 ========================================================== */
 function renderProducaoVertical(filtro = "") {
     const container = document.getElementById("productionVerticalList");
     if (!container) return;
     container.innerHTML = "";
 
-    if (!window.pedidos || !Array.isArray(window.pedidos)) {
-        container.innerHTML = "<p style='color: var(--ink-soft); text-align:center;'>Nenhum dado encontrado em dados.js</p>";
-        return;
-    }
+    if (!window.pedidos || !Array.isArray(window.pedidos)) return;
 
     const filtrados = window.pedidos.filter(p => {
         if (p.status !== "producao") return false;
-        const detTexto = p.detalhes ? Object.values(p.detalhes).join(' ') : '';
-        const textoCompleto = `${p.id} ${p.cliente || ''} ${p.cor || ''} ${p.tipo || ''} ${detTexto}`.toLowerCase();
+        const textoCompleto = `${p.id} ${p.cliente || ''} ${p.cor || ''} ${p.tipo || ''}`.toLowerCase();
         return textoCompleto.includes(filtro);
     });
 
@@ -91,11 +99,10 @@ function renderProducaoVertical(filtro = "") {
         const locLamina = (p.estanteLamina && p.prtLamina) ? `${p.estanteLamina} (${p.prtLamina})` : "Não def.";
         const locEixo = p.localEixos || "Não def.";
         const estaAberto = window.pedidosAbertos[p.id] === true;
-        const detalhesAbertos = window.detalhesAbertos[p.id] === true;
 
-        const det = p.detalhes || { 
-            laminas: "Não especificado", guia: "Não especificado", soleira: "Não especificada", eixo: "Não especificado", motor: "Não especificado" 
-        };
+        const comp = calcularComponentes(p);
+        const largM = p.largura ? p.largura.toFixed(2) : "3.00";
+        const altM = p.altura ? p.altura.toFixed(2) : "2.50";
 
         const div = document.createElement("div");
         div.style.cssText = `
@@ -104,46 +111,52 @@ function renderProducaoVertical(filtro = "") {
         `;
 
         div.innerHTML = `
-            <div onclick="toggleDropdownProd(${p.id})" style="display:flex; justify-content:space-between; align-items:center; cursor: pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
                     <strong style="font-size: 14px; color:#0f172a;">#${p.id} - ${p.cliente}</strong>
-                    <div style="font-size: 11px; color: #64748b; margin-top:2px;">
-                        Expedição: <strong>${p.expedicao}</strong> | Tamanho: <strong>${p.tamanho || 'N/A'}</strong>
+                    <div style="font-size: 11px; color: #0284c7; font-weight: bold; margin-top:2px;">
+                        📐 Porta: ${comp.dimensao}
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap: 8px;">
                     <span style="${getEstiloTagCor(p.cor)} padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight:bold;">${p.cor}</span>
-                    <span id="seta-p-${p.id}" style="font-size: 12px; font-weight: bold; color: #64748b;">${estaAberto ? '▲' : '▼'}</span>
+                    <button onclick="toggleDropdownProd(${p.id})" style="background:none; border:none; cursor:pointer; font-size:12px; color:#64748b; font-weight:bold;">
+                        ${estaAberto ? '▲ Fechar' : '▼ Editar Locais'}
+                    </button>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; background: #f8fafc; padding: 6px 8px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; font-size: 10px;">
-                <div><span style="color: #64748b; display:block; font-weight:bold;">LÂMINAS</span><strong style="color: #0284c7;">${locLamina}</strong></div>
-                <div><span style="color: #64748b; display:block; font-weight:bold;">EIXOS</span><strong style="color: #0284c7;">${locEixo}</strong></div>
-                <div><span style="color: #64748b; display:block; font-weight:bold;">GUIAS</span><strong style="color: #0f172a;">${prateleiraFixaCor}</strong></div>
-                <div><span style="color: #64748b; display:block; font-weight:bold;">SOLEIRAS</span><strong style="color: #0f172a;">${prateleiraFixaCor}</strong></div>
+            <!-- RESUMO DOS COMPONENTES E SEUS TAMANHOS DENTRO DO CARD -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; font-size: 10px;">
+                <div>
+                    <span style="color: #64748b; display:block; font-weight:bold;">LÂMINA (${largM}m)</span>
+                    <strong style="color: #0284c7;">${locLamina}</strong>
+                </div>
+                <div>
+                    <span style="color: #64748b; display:block; font-weight:bold;">EIXO (${largM}m)</span>
+                    <strong style="color: #0284c7;">${locEixo}</strong>
+                </div>
+                <div>
+                    <span style="color: #64748b; display:block; font-weight:bold;">GUIA (${altM}m)</span>
+                    <strong style="color: #0f172a;">${prateleiraFixaCor}</strong>
+                </div>
+                <div>
+                    <span style="color: #64748b; display:block; font-weight:bold;">SOLEIRA (${largM}m)</span>
+                    <strong style="color: #0f172a;">${prateleiraFixaCor}</strong>
+                </div>
             </div>
 
-            <button onclick="toggleDetalhes(${p.id})" style="width: 100%; margin-top: 8px; padding: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; font-weight: bold; color: #334155; cursor: pointer; text-align: center;">
-                📐 ${detalhesAbertos ? 'Ocultar Medidas e Itens da Porta' : 'Ver Medidas e Itens da Porta'}
+            <!-- BOTÃO PARA ABRIR A MODAL COM DETALHES E CHECKLIST DAS PEÇAS -->
+            <button onclick="abrirModalDetalhesPorta(${p.id})" style="width: 100%; margin-top: 8px; padding: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; text-align: center;">
+                📋 Abrir Detalhes da Porta & Check-list das Peças
             </button>
 
-            <div id="detalhes-p-${p.id}" style="display: ${detalhesAbertos ? 'block' : 'none'}; margin-top: 8px; padding: 10px; background: #fffbe0; border: 1px solid #fef08a; border-radius: 6px; font-size: 11px; color: #1e293b;">
-                <strong style="display:block; margin-bottom: 6px; color: #854d0e;">📋 Especificações da Porta:</strong>
-                <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
-                    <li><strong>Lâminas:</strong> ${det.laminas}</li>
-                    <li><strong>Guias:</strong> ${det.guia}</li>
-                    <li><strong>Soleira:</strong> ${det.soleira}</li>
-                    <li><strong>Eixo:</strong> ${det.eixo}</li>
-                    <li><strong>Motor / Ferragens:</strong> ${det.motor}</li>
-                </ul>
-            </div>
-
+            <!-- SEÇÃO DE EDIÇÃO RÁPIDA DE ENDEREÇAMENTO -->
             <div id="dropdown-p-${p.id}" style="display: ${estaAberto ? 'block' : 'none'}; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f1f5f9;">
-                <div style="font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 8px;">Editar Localização por Peça:</div>
+                <div style="font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 8px;">Endereçar Componentes no Pátio:</div>
                 <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; font-size: 11px;">
                     <div style="background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                        <span style="font-weight: bold; color: #0284c7; display: block; margin-bottom: 4px;">🧱 Lâminas:</span>
+                        <span style="font-weight: bold; color: #0284c7; display: block; margin-bottom: 4px;">🧱 Lâminas (${largM}m):</span>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
                             <select id="select-estante-lamina-${p.id}" onchange="salvarLocaisProducao(${p.id})" class="modal-select" style="margin:0; padding:8px; font-size:12px;">
                                 <option value="">Estante...</option>
@@ -157,7 +170,7 @@ function renderProducaoVertical(filtro = "") {
                     </div>
 
                     <div style="background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                        <span style="font-weight: bold; color: #0284c7; display: block; margin-bottom: 4px;">🔩 Eixos:</span>
+                        <span style="font-weight: bold; color: #0284c7; display: block; margin-bottom: 4px;">🔩 Eixos (${largM}m):</span>
                         <select id="select-eixo-${p.id}" onchange="salvarLocaisProducao(${p.id})" class="modal-select" style="margin:0; padding:8px; font-size:12px;">
                             <option value="">Selecione a Prateleira do Eixo...</option>
                             ${[1,2,3,4,5,6,7,8].map(n => `<option value="Prateleira ${n}" ${p.localEixos === `Prateleira ${n}` ? 'selected' : ''}>Prateleira ${n}</option>`).join('')}
@@ -166,7 +179,7 @@ function renderProducaoVertical(filtro = "") {
                 </div>
 
                 <div style="display: flex;">
-                    <button onclick="abrirAlocacaoEstoque(${p.id})" style="flex:1; padding:8px; background:#16a34a; color:white; border:none; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">📦 Enviar p/ Estoque Final</button>
+                    <button onclick="abrirAlocacaoEstoque(${p.id})" style="flex:1; padding:8px; background:#16a34a; color:white; border:none; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">📦 Finalizar e Enviar p/ Estoque</button>
                 </div>
             </div>`;
         container.appendChild(div);
@@ -174,7 +187,7 @@ function renderProducaoVertical(filtro = "") {
 }
 
 /* ==========================================================
-   2. ESTOQUE FINAL (GRID COM DETALHES DAS PEÇAS)
+   2. ESTOQUE FINAL (GRID COM DETALHES DE COMPONENTES E TAMANHOS)
 ========================================================== */
 function renderEstoqueGrid(filtro = "") {
     const container = document.getElementById("stockGridList");
@@ -185,9 +198,8 @@ function renderEstoqueGrid(filtro = "") {
 
     const filtrados = window.pedidos.filter(p => {
         if (p.status !== "estoque") return false;
-        const detTexto = p.detalhes ? Object.values(p.detalhes).join(' ') : '';
         const locaisTexto = p.locais ? p.locais.join(' ') : '';
-        const textoCompleto = `${p.id} ${p.cliente || ''} ${p.cor || ''} ${p.tipo || ''} ${locaisTexto} ${detTexto}`.toLowerCase();
+        const textoCompleto = `${p.id} ${p.cliente || ''} ${p.cor || ''} ${p.tipo || ''} ${locaisTexto}`.toLowerCase();
         return textoCompleto.includes(filtro);
     });
 
@@ -197,11 +209,7 @@ function renderEstoqueGrid(filtro = "") {
     }
 
     filtrados.forEach(p => {
-        const detalhesAbertos = window.detalhesAbertos[p.id] === true;
-        const det = p.detalhes || { 
-            laminas: "Não especificado", guia: "Não especificado", soleira: "Não especificada", eixo: "Não especificado", motor: "Não especificado" 
-        };
-
+        const comp = calcularComponentes(p);
         const div = document.createElement("div");
         div.className = "kpi-card";
         div.style.cssText = `
@@ -213,32 +221,21 @@ function renderEstoqueGrid(filtro = "") {
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div>
                     <strong style="font-size: 14px; color:#0f172a;">#${p.id} - ${p.cliente}</strong>
-                    <div style="font-size: 11px; color: #64748b; margin-top:3px;">
-                        Expedição: <strong>${p.expedicao}</strong> | Tamanho: <strong>${p.tamanho || 'N/A'}</strong>
+                    <div style="font-size: 11px; color: #166534; font-weight:bold; margin-top:3px;">
+                        📐 Porta: ${comp.dimensao}
                     </div>
                 </div>
                 <span style="${getEstiloTagCor(p.cor)} padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight:bold;">${p.cor}</span>
             </div>
             
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin: 10px 0;">
-                <span style="font-size: 10px; color: #64748b; display:block; margin-bottom:2px;">📍 Posições no Estoque:</span>
+                <span style="font-size: 10px; color: #64748b; display:block; margin-bottom:2px;">📍 Posições de Saída no Pátio:</span>
                 <strong style="font-size: 12px; color: #0369a1;">${p.locais ? p.locais.join(", ") : "A alocar"}</strong>
             </div>
 
-            <button onclick="toggleDetalhes(${p.id})" style="width: 100%; margin-bottom: 8px; padding: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; font-weight: bold; color: #334155; cursor: pointer; text-align: center;">
-                📐 ${detalhesAbertos ? 'Ocultar Itens da Porta' : 'Ver Itens / Medidas da Porta'}
+            <button onclick="abrirModalDetalhesPorta(${p.id})" style="width: 100%; margin-bottom: 8px; padding: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                📋 Ver Especificações & Itens da Porta
             </button>
-
-            <div id="detalhes-p-${p.id}" style="display: ${detalhesAbertos ? 'block' : 'none'}; margin-bottom: 10px; padding: 10px; background: #fffbe0; border: 1px solid #fef08a; border-radius: 6px; font-size: 11px; color: #1e293b;">
-                <strong style="display:block; margin-bottom: 6px; color: #854d0e;">📋 Componentes Inclusos:</strong>
-                <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
-                    <li><strong>Lâminas:</strong> ${det.laminas}</li>
-                    <li><strong>Guias:</strong> ${det.guia}</li>
-                    <li><strong>Soleira:</strong> ${det.soleira}</li>
-                    <li><strong>Eixo:</strong> ${det.eixo}</li>
-                    <li><strong>Motor / Ferragens:</strong> ${det.motor}</li>
-                </ul>
-            </div>
             
             <div style="display: flex; gap: 6px;">
                 <button onclick="abrirAlocacaoEstoque(${p.id})" style="flex:1; padding:8px; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">Alterar Nichos</button>
@@ -248,14 +245,91 @@ function renderEstoqueGrid(filtro = "") {
 }
 
 /* ==========================================================
-   FUNÇÕES AUXILIARES E EVENTOS
+   3. MODAL DE DETALHES DA PORTA & CHECK-LIST DE PEÇAS
 ========================================================== */
-window.toggleDetalhes = function(id) {
-    window.detalhesAbertos[id] = !window.detalhesAbertos[id];
-    const filtro = document.getElementById("globalSearch")?.value.toLowerCase() || "";
-    updateAll(filtro);
+window.abrirModalDetalhesPorta = function(id) {
+    const p = window.pedidos.find(x => x.id === id);
+    if (!p) return;
+
+    const modal = document.getElementById("modal");
+    const modalBody = document.getElementById("modalBody");
+    if (!modal || !modalBody) return;
+
+    const comp = calcularComponentes(p);
+    const prateleiraFixaCor = (window.mapaCoresPrateleiras && window.mapaCoresPrateleiras[p.cor]) ? window.mapaCoresPrateleiras[p.cor] : "Prateleira Padrão";
+    const locLamina = (p.estanteLamina && p.prtLamina) ? `${p.estanteLamina} (${p.prtLamina})` : "Pátio / Não def.";
+    const locEixo = p.localEixos || "Pátio / Não def.";
+
+    modalBody.innerHTML = `
+        <div>
+            <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">
+                <span style="font-size: 11px; color: #0284c7; font-weight: bold; text-transform: uppercase;">Detalhamento Técnico de Produção</span>
+                <h3 style="margin: 2px 0 0; font-size: 16px; color: #0f172a;">Pedido #${p.id} — ${p.cliente}</h3>
+                <div style="font-size: 12px; color: #475569; margin-top: 4px;">
+                    Dimensão Total: <strong>${comp.dimensao}</strong>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <strong style="font-size: 12px; color: #334155; display: block; margin-bottom: 8px;">Itens da Porta & Localização Atual:</strong>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 11px;">
+                        <div>
+                            <input type="checkbox" onchange="salvarCheck(${p.id}, 'lamina')" ${window.checksConcluidos[`${p.id}_lamina`] ? 'checked' : ''}> 
+                            <strong>Lâminas:</strong> ${comp.laminas}
+                        </div>
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: bold;">📍 ${locLamina}</span>
+                    </label>
+
+                    <label style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 11px;">
+                        <div>
+                            <input type="checkbox" onchange="salvarCheck(${p.id}, 'eixo')" ${window.checksConcluidos[`${p.id}_eixo`] ? 'checked' : ''}> 
+                            <strong>Eixo:</strong> ${comp.eixo}
+                        </div>
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: bold;">📍 ${locEixo}</span>
+                    </label>
+
+                    <label style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 11px;">
+                        <div>
+                            <input type="checkbox" onchange="salvarCheck(${p.id}, 'guia')" ${window.checksConcluidos[`${p.id}_guia`] ? 'checked' : ''}> 
+                            <strong>Guias:</strong> ${comp.guia}
+                        </div>
+                        <span style="background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-weight: bold;">📍 ${prateleiraFixaCor}</span>
+                    </label>
+
+                    <label style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 11px;">
+                        <div>
+                            <input type="checkbox" onchange="salvarCheck(${p.id}, 'soleira')" ${window.checksConcluidos[`${p.id}_soleira`] ? 'checked' : ''}> 
+                            <strong>Soleira:</strong> ${comp.soleira}
+                        </div>
+                        <span style="background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-weight: bold;">📍 ${prateleiraFixaCor}</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- WARNING SIMULAÇÃO -->
+            <div class="warning-box">
+                ⚠️ <strong>Aviso Demonstrativo:</strong> As dimensões e quantidades de peças apresentadas são simulações calculadas automaticamente para validação do protótipo do sistema.
+            </div>
+
+            <button onclick="document.getElementById('modal').classList.remove('open')" style="width: 100%; margin-top: 12px; padding: 10px; background: #0f172a; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">
+                Fechar
+            </button>
+        </div>
+    `;
+
+    modal.classList.add("open");
 };
 
+window.salvarCheck = function(id, item) {
+    const key = `${id}_${item}`;
+    window.checksConcluidos[key] = !window.checksConcluidos[key];
+};
+
+/* ==========================================================
+   FUNÇÕES AUXILIARES DE EVENTOS
+========================================================== */
 window.toggleDropdownProd = function(id) {
     window.pedidosAbertos[id] = !window.pedidosAbertos[id];
     const filtro = document.getElementById("globalSearch")?.value.toLowerCase() || "";
@@ -280,55 +354,7 @@ window.salvarLocaisProducao = function(id) {
 };
 
 /* ==========================================================
-   3. SIMULADOR DE LEITOR QR CODE
-========================================================== */
-function popularSimuladorQr() {
-    const selPedido = document.getElementById("qrSelectPedido");
-    const selPrateleira = document.getElementById("qrSelectPrateleira");
-    if (!selPedido || !selPrateleira) return;
-
-    selPedido.innerHTML = '<option value="">Selecione o pedido escaneado...</option>';
-    (window.pedidos || []).filter(p => p.status === "producao").forEach(p => {
-        selPedido.innerHTML += `<option value="${p.id}">#${p.id} - ${p.cliente} (${p.cor})</option>`;
-    });
-
-    selPrateleira.innerHTML = '<option value="">Selecione a prateleira escaneada...</option>';
-    (window.estantesEstoque || []).forEach(est => {
-        for (let i = 1; i <= 8; i++) {
-            selPrateleira.innerHTML += `<option value="${est}-${i}">Estante ${est} - Prateleira ${i}</option>`;
-        }
-    });
-}
-
-window.executarCheckinQrCode = function() {
-    const elPed = document.getElementById("qrSelectPedido");
-    const elPrt = document.getElementById("qrSelectPrateleira");
-    const feedback = document.getElementById("qrFeedback");
-
-    if (!elPed || !elPrt || !elPed.value || !elPrt.value) {
-        alert("Por favor, selecione tanto o pedido quanto a prateleira simulando a leitura dos QR codes.");
-        return;
-    }
-
-    const p = window.pedidos.find(x => x.id == elPed.value);
-    if (!p) return;
-
-    p.status = "estoque";
-    p.locais = [elPrt.value];
-
-    if (feedback) {
-        feedback.style.display = "block";
-        feedback.style.background = "#dcfce7";
-        feedback.style.color = "#15803d";
-        feedback.innerHTML = `✔ Sucesso! Pedido #${p.id} (${p.cliente}) alocado na prateleira <strong>${elPrt.value}</strong> via QR Code!`;
-    }
-
-    updateAll();
-    setTimeout(() => { popularSimuladorQr(); }, 2000);
-};
-
-/* ==========================================================
-   4. MODAL E CRIAÇÃO AVULSA
+   4. MODAL DE ALOCAÇÃO DE ESTOQUE E CRIAÇÃO
 ========================================================== */
 function setupModal() {
     const modal = document.getElementById("modal");
@@ -413,7 +439,7 @@ function setupAvulso() {
     const btn = document.getElementById("btnAdicionarAvulso");
     if (btn) {
         btn.addEventListener("click", () => {
-            const item = prompt("Nome do cliente ou descrição do pedido:");
+            const item = prompt("Nome do cliente:");
             if (item) {
                 const novoId = Math.floor(Math.random() * 90000) + 10000;
                 window.pedidos.push({
@@ -421,19 +447,13 @@ function setupAvulso() {
                     cliente: item,
                     tipo: "Com Pintura",
                     cor: "Cinza",
-                    tamanho: "3.00m x 2.50m",
+                    largura: 3.00,
+                    altura: 2.50,
                     status: "producao",
                     expedicao: window.HOJE || "2026-07-29",
                     estanteLamina: "",
                     prtLamina: "",
-                    localEixos: "",
-                    detalhes: {
-                        laminas: "30x Lâminas Meia Cana (3.00m)",
-                        guia: "2x Guias U 70x30mm (2.50m)",
-                        soleira: "1x Soleira (3.00m)",
-                        eixo: "1x Eixo Tubo 4.1/2\" (3.00m)",
-                        motor: "1x Motor AC Standard"
-                    }
+                    localEixos: ""
                 });
                 updateAll();
             }
