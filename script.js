@@ -1,5 +1,5 @@
 /* ==========================================================
-   SISTEMA DE GESTÃO - SCRIPT COM DETALHES DE ITENS E MEDIDAS
+   SISTEMA DE GESTÃO DE PORTAS DE ROLAR - SCRIPT COMPLETO
 ========================================================== */
 
 function getEstiloTagCor(cor) {
@@ -36,7 +36,15 @@ function setupNavigation() {
             buttons.forEach(b => b.classList.remove("active"));
             pages.forEach(p => p.classList.remove("active"));
             btn.classList.add("active");
-            document.getElementById(btn.dataset.page).classList.add("active");
+            
+            const targetPage = document.getElementById(btn.dataset.page);
+            if (targetPage) {
+                targetPage.classList.add("active");
+            }
+            
+            if (btn.dataset.page === "pageQrScanner") {
+                popularSimuladorQr();
+            }
         });
     });
 }
@@ -54,19 +62,22 @@ function setupSearch() {
 }
 
 /* ==========================================================
-   1. PRODUÇÃO (MANTÉM DROPDOWN + DETALHES DAS PEÇAS)
+   1. PRODUÇÃO (SUPORTA BUSCA POR COMPONENTES E SANFONA)
 ========================================================== */
 function renderProducaoVertical(filtro = "") {
     const container = document.getElementById("productionVerticalList");
     if (!container) return;
     container.innerHTML = "";
 
+    if (!window.pedidos || !Array.isArray(window.pedidos)) {
+        container.innerHTML = "<p style='color: var(--ink-soft); text-align:center;'>Nenhum dado encontrado em dados.js</p>";
+        return;
+    }
+
     const filtrados = window.pedidos.filter(p => {
         if (p.status !== "producao") return false;
-        const textoCompleto = `
-            ${p.id} ${p.cliente} ${p.cor} ${p.tipo} 
-            ${p.detalhes ? Object.values(p.detalhes).join(' ') : ''}
-        `.toLowerCase();
+        const detTexto = p.detalhes ? Object.values(p.detalhes).join(' ') : '';
+        const textoCompleto = `${p.id} ${p.cliente || ''} ${p.cor || ''} ${p.tipo || ''} ${detTexto}`.toLowerCase();
         return textoCompleto.includes(filtro);
     });
 
@@ -76,13 +87,15 @@ function renderProducaoVertical(filtro = "") {
     }
 
     filtrados.forEach(p => {
-        const prateleiraFixaCor = window.mapaCoresPrateleiras[p.cor] || "Prateleira Padrão";
+        const prateleiraFixaCor = (window.mapaCoresPrateleiras && window.mapaCoresPrateleiras[p.cor]) ? window.mapaCoresPrateleiras[p.cor] : "Prateleira Padrão";
         const locLamina = (p.estanteLamina && p.prtLamina) ? `${p.estanteLamina} (${p.prtLamina})` : "Não def.";
         const locEixo = p.localEixos || "Não def.";
         const estaAberto = window.pedidosAbertos[p.id] === true;
         const detalhesAbertos = window.detalhesAbertos[p.id] === true;
 
-        const det = p.detalhes || { laminas: "Não especificado", guia: "Não especificado", soleira: "Não especificada", eixo: "Não especificado", motor: "Não especificado" };
+        const det = p.detalhes || { 
+            laminas: "Não especificado", guia: "Não especificado", soleira: "Não especificada", eixo: "Não especificado", motor: "Não especificado" 
+        };
 
         const div = document.createElement("div");
         div.style.cssText = `
@@ -111,12 +124,10 @@ function renderProducaoVertical(filtro = "") {
                 <div><span style="color: #64748b; display:block; font-weight:bold;">SOLEIRAS</span><strong style="color: #0f172a;">${prateleiraFixaCor}</strong></div>
             </div>
 
-            <!-- BOTÃO PARA VER MEDIDAS DA PORTA -->
             <button onclick="toggleDetalhes(${p.id})" style="width: 100%; margin-top: 8px; padding: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; font-weight: bold; color: #334155; cursor: pointer; text-align: center;">
                 📐 ${detalhesAbertos ? 'Ocultar Medidas e Itens da Porta' : 'Ver Medidas e Itens da Porta'}
             </button>
 
-            <!-- PAINEL RETRÁTIL COM AS MEDIDAS / COMPONENTES -->
             <div id="detalhes-p-${p.id}" style="display: ${detalhesAbertos ? 'block' : 'none'}; margin-top: 8px; padding: 10px; background: #fffbe0; border: 1px solid #fef08a; border-radius: 6px; font-size: 11px; color: #1e293b;">
                 <strong style="display:block; margin-bottom: 6px; color: #854d0e;">📋 Especificações da Porta:</strong>
                 <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
@@ -128,7 +139,6 @@ function renderProducaoVertical(filtro = "") {
                 </ul>
             </div>
 
-            <!-- DROPDOWN COM SELETORES DE LOCALIZAÇÃO -->
             <div id="dropdown-p-${p.id}" style="display: ${estaAberto ? 'block' : 'none'}; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f1f5f9;">
                 <div style="font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 8px;">Editar Localização por Peça:</div>
                 <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; font-size: 11px;">
@@ -137,7 +147,7 @@ function renderProducaoVertical(filtro = "") {
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
                             <select id="select-estante-lamina-${p.id}" onchange="salvarLocaisProducao(${p.id})" class="modal-select" style="margin:0; padding:8px; font-size:12px;">
                                 <option value="">Estante...</option>
-                                ${window.estantesLaminas.map(e => `<option value="${e}" ${p.estanteLamina === e ? 'selected' : ''}>${e}</option>`).join('')}
+                                ${(window.estantesLaminas || []).map(e => `<option value="${e}" ${p.estanteLamina === e ? 'selected' : ''}>${e}</option>`).join('')}
                             </select>
                             <select id="select-prt-lamina-${p.id}" onchange="salvarLocaisProducao(${p.id})" class="modal-select" style="margin:0; padding:8px; font-size:12px;">
                                 <option value="">Prateleira...</option>
@@ -164,20 +174,20 @@ function renderProducaoVertical(filtro = "") {
 }
 
 /* ==========================================================
-   2. ESTOQUE FINAL (COM VISUALIZAÇÃO DE ITENS E TAMANHOS)
+   2. ESTOQUE FINAL (GRID COM DETALHES DAS PEÇAS)
 ========================================================== */
 function renderEstoqueGrid(filtro = "") {
     const container = document.getElementById("stockGridList");
     if (!container) return;
     container.innerHTML = "";
 
+    if (!window.pedidos || !Array.isArray(window.pedidos)) return;
+
     const filtrados = window.pedidos.filter(p => {
         if (p.status !== "estoque") return false;
-        const textoCompleto = `
-            ${p.id} ${p.cliente} ${p.cor} ${p.tipo} 
-            ${p.locais ? p.locais.join(' ') : ''} 
-            ${p.detalhes ? Object.values(p.detalhes).join(' ') : ''}
-        `.toLowerCase();
+        const detTexto = p.detalhes ? Object.values(p.detalhes).join(' ') : '';
+        const locaisTexto = p.locais ? p.locais.join(' ') : '';
+        const textoCompleto = `${p.id} ${p.cliente || ''} ${p.cor || ''} ${p.tipo || ''} ${locaisTexto} ${detTexto}`.toLowerCase();
         return textoCompleto.includes(filtro);
     });
 
@@ -188,7 +198,9 @@ function renderEstoqueGrid(filtro = "") {
 
     filtrados.forEach(p => {
         const detalhesAbertos = window.detalhesAbertos[p.id] === true;
-        const det = p.detalhes || { laminas: "Não especificado", guia: "Não especificado", soleira: "Não especificada", eixo: "Não especificado", motor: "Não especificado" };
+        const det = p.detalhes || { 
+            laminas: "Não especificado", guia: "Não especificado", soleira: "Não especificada", eixo: "Não especificado", motor: "Não especificado" 
+        };
 
         const div = document.createElement("div");
         div.className = "kpi-card";
@@ -213,12 +225,10 @@ function renderEstoqueGrid(filtro = "") {
                 <strong style="font-size: 12px; color: #0369a1;">${p.locais ? p.locais.join(", ") : "A alocar"}</strong>
             </div>
 
-            <!-- BOTÃO RETRÁTIL DE DETALHES NO ESTOQUE -->
             <button onclick="toggleDetalhes(${p.id})" style="width: 100%; margin-bottom: 8px; padding: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; font-weight: bold; color: #334155; cursor: pointer; text-align: center;">
                 📐 ${detalhesAbertos ? 'Ocultar Itens da Porta' : 'Ver Itens / Medidas da Porta'}
             </button>
 
-            <!-- ESPECIFICAÇÕES DOS COMPONENTES DA PORTA -->
             <div id="detalhes-p-${p.id}" style="display: ${detalhesAbertos ? 'block' : 'none'}; margin-bottom: 10px; padding: 10px; background: #fffbe0; border: 1px solid #fef08a; border-radius: 6px; font-size: 11px; color: #1e293b;">
                 <strong style="display:block; margin-bottom: 6px; color: #854d0e;">📋 Componentes Inclusos:</strong>
                 <ul style="margin: 0; padding-left: 16px; line-height: 1.5;">
@@ -237,31 +247,88 @@ function renderEstoqueGrid(filtro = "") {
     });
 }
 
-// Alterna visibilidade dos detalhes da porta
+/* ==========================================================
+   FUNÇÕES AUXILIARES E EVENTOS
+========================================================== */
 window.toggleDetalhes = function(id) {
     window.detalhesAbertos[id] = !window.detalhesAbertos[id];
-    updateAll(document.getElementById("globalSearch")?.value.toLowerCase() || "");
+    const filtro = document.getElementById("globalSearch")?.value.toLowerCase() || "";
+    updateAll(filtro);
 };
 
 window.toggleDropdownProd = function(id) {
     window.pedidosAbertos[id] = !window.pedidosAbertos[id];
-    renderProducaoVertical(document.getElementById("globalSearch")?.value.toLowerCase() || "");
+    const filtro = document.getElementById("globalSearch")?.value.toLowerCase() || "";
+    renderProducaoVertical(filtro);
 };
 
 window.salvarLocaisProducao = function(id) {
     const p = window.pedidos.find(x => x.id === id);
     if (!p) return;
 
-    p.estanteLamina = document.getElementById(`select-estante-lamina-${id}`).value;
-    p.prtLamina = document.getElementById(`select-prt-lamina-${id}`).value;
-    p.localEixos = document.getElementById(`select-eixo-${id}`).value;
+    const elEstante = document.getElementById(`select-estante-lamina-${id}`);
+    const elPrt = document.getElementById(`select-prt-lamina-${id}`);
+    const elEixo = document.getElementById(`select-eixo-${id}`);
+
+    if (elEstante) p.estanteLamina = elEstante.value;
+    if (elPrt) p.prtLamina = elPrt.value;
+    if (elEixo) p.localEixos = elEixo.value;
     
     window.pedidosAbertos[id] = true;
-    renderProducaoVertical(document.getElementById("globalSearch")?.value.toLowerCase() || "");
+    const filtro = document.getElementById("globalSearch")?.value.toLowerCase() || "";
+    renderProducaoVertical(filtro);
 };
 
 /* ==========================================================
-   MODAL E CRIAÇÃO
+   3. SIMULADOR DE LEITOR QR CODE
+========================================================== */
+function popularSimuladorQr() {
+    const selPedido = document.getElementById("qrSelectPedido");
+    const selPrateleira = document.getElementById("qrSelectPrateleira");
+    if (!selPedido || !selPrateleira) return;
+
+    selPedido.innerHTML = '<option value="">Selecione o pedido escaneado...</option>';
+    (window.pedidos || []).filter(p => p.status === "producao").forEach(p => {
+        selPedido.innerHTML += `<option value="${p.id}">#${p.id} - ${p.cliente} (${p.cor})</option>`;
+    });
+
+    selPrateleira.innerHTML = '<option value="">Selecione a prateleira escaneada...</option>';
+    (window.estantesEstoque || []).forEach(est => {
+        for (let i = 1; i <= 8; i++) {
+            selPrateleira.innerHTML += `<option value="${est}-${i}">Estante ${est} - Prateleira ${i}</option>`;
+        }
+    });
+}
+
+window.executarCheckinQrCode = function() {
+    const elPed = document.getElementById("qrSelectPedido");
+    const elPrt = document.getElementById("qrSelectPrateleira");
+    const feedback = document.getElementById("qrFeedback");
+
+    if (!elPed || !elPrt || !elPed.value || !elPrt.value) {
+        alert("Por favor, selecione tanto o pedido quanto a prateleira simulando a leitura dos QR codes.");
+        return;
+    }
+
+    const p = window.pedidos.find(x => x.id == elPed.value);
+    if (!p) return;
+
+    p.status = "estoque";
+    p.locais = [elPrt.value];
+
+    if (feedback) {
+        feedback.style.display = "block";
+        feedback.style.background = "#dcfce7";
+        feedback.style.color = "#15803d";
+        feedback.innerHTML = `✔ Sucesso! Pedido #${p.id} (${p.cliente}) alocado na prateleira <strong>${elPrt.value}</strong> via QR Code!`;
+    }
+
+    updateAll();
+    setTimeout(() => { popularSimuladorQr(); }, 2000);
+};
+
+/* ==========================================================
+   4. MODAL E CRIAÇÃO AVULSA
 ========================================================== */
 function setupModal() {
     const modal = document.getElementById("modal");
@@ -285,7 +352,7 @@ window.abrirAlocacaoEstoque = function(id) {
     }
 
     let htmlCheckboxesEstantes = "";
-    window.estantesEstoque.forEach(est => {
+    (window.estantesEstoque || []).forEach(est => {
         htmlCheckboxesEstantes += `
             <label style="display: flex; align-items: center; gap: 8px; background: #f1f5f9; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;">
                 <input type="checkbox" name="estanteCheck" value="${est}" style="width: 18px; height: 18px;"> Estante ${est}
@@ -322,7 +389,7 @@ window.salvarAlocacao = function(id) {
     const p = window.pedidos.find(x => x.id === id);
     if (!p) return;
 
-    const nivelSelecionado = document.getElementById("selectNivelPrateleira").value;
+    const elNivel = document.getElementById("selectNivelPrateleira");
     const checkboxes = document.querySelectorAll('input[name="estanteCheck"]:checked');
 
     if (checkboxes.length === 0) {
@@ -332,7 +399,7 @@ window.salvarAlocacao = function(id) {
 
     let novasLocais = [];
     checkboxes.forEach(chk => {
-        novasLocais.push(`${chk.value}-${nivelSelecionado}`);
+        novasLocais.push(`${chk.value}-${elNivel.value}`);
     });
 
     p.status = "estoque";
@@ -356,7 +423,7 @@ function setupAvulso() {
                     cor: "Cinza",
                     tamanho: "3.00m x 2.50m",
                     status: "producao",
-                    expedicao: window.HOJE,
+                    expedicao: window.HOJE || "2026-07-29",
                     estanteLamina: "",
                     prtLamina: "",
                     localEixos: "",
