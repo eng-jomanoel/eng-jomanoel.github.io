@@ -6,9 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
     <title>Localizador de Estoque — Portas de Rolar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -40,66 +38,44 @@
         <div class="tabs">
             <button class="menu-button active" data-page="pageProducao">Produção</button>
             <button class="menu-button" data-page="pageEstoque">Estoque Final</button>
-            <button class="menu-button" data-page="pageQrScanner" style="background: #0284c7; color: white;">📷 Leitor QR Check-in</button>
         </div>
 
-        <!-- ABA 1: PRODUÇÃO (LISTA VERTICAL) -->
+        <!-- ABA 1: PRODUÇÃO -->
         <div id="pageProducao" class="page active">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
                 <div>
                     <h3 style="margin:0;">Pedidos em Produção</h3>
-                    <p style="font-size: 13px; color: var(--ink-soft); margin-top:2px;">Toque no pedido para abrir e selecionar os locais via dropdown.</p>
+                    <p style="font-size: 13px; color: var(--ink-soft); margin-top:2px;">Toque na porta para abrir os detalhes e a checklist de componentes.</p>
                 </div>
                 <button id="btnAdicionarAvulso" class="btn-avulso">+ Novo Pedido</button>
             </div>
+            
             <div id="productionVerticalList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+
+            <div class="warning-box">
+                ⚠️ <strong>Nota demonstrativa:</strong> Todas as dimensões de lâminas, guias, eixos e soleiras listadas nesta aba foram geradas automaticamente para fins de simulação de protótipo.
+            </div>
         </div>
 
-        <!-- ABA 2: ESTOQUE FINAL (FORMATO GRID) -->
+        <!-- ABA 2: ESTOQUE FINAL -->
         <div id="pageEstoque" class="page">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
                 <div>
                     <h3 style="margin:0;">Estoque Final / Expedição</h3>
-                    <p style="font-size: 13px; color: var(--ink-soft); margin-top:2px;">Pedidos prontos alocados nas estantes de saída.</p>
+                    <p style="font-size: 13px; color: var(--ink-soft); margin-top:2px;">Pedidos prontos e alocados nas estantes do pátio para saída.</p>
                 </div>
             </div>
-            <!-- Utiliza a classe production-cards-grid para organizar em grade -->
+            
             <div id="stockGridList" class="production-cards-grid"></div>
-        </div>
 
-        <!-- ABA 3: SIMULAÇÃO DE LEITOR QR CODE -->
-        <div id="pageQrScanner" class="page">
-            <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <h3 style="margin-top:0; color: #0f172a;">Simulador de Leitor QR Code (Expedição)</h3>
-                <p style="font-size: 13px; color: #64748b; margin-bottom: 14px;">
-                    Simule a pistola de leitura ou a câmera do celular no momento em que a porta chega na expedição.
-                </p>
-
-                <div style="margin-bottom: 12px;">
-                    <label style="font-size: 12px; font-weight: bold; color: #334155; display:block; margin-bottom:4px;">1. Ler QR Code da Porta / Pedido:</label>
-                    <select id="qrSelectPedido" class="modal-select" style="padding: 10px; font-size: 13px;">
-                        <option value="">Selecione o pedido escaneado...</option>
-                    </select>
-                </div>
-
-                <div style="margin-bottom: 16px;">
-                    <label style="font-size: 12px; font-weight: bold; color: #334155; display:block; margin-bottom:4px;">2. Ler QR Code da Prateleira de Destino:</label>
-                    <select id="qrSelectPrateleira" class="modal-select" style="padding: 10px; font-size: 13px;">
-                        <option value="">Selecione a prateleira escaneada...</option>
-                    </select>
-                </div>
-
-                <button onclick="executarCheckinQrCode()" style="width: 100%; padding: 12px; background: #16a34a; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px;">
-                    ⚡ Confirmar Check-in via QR Code
-                </button>
-
-                <div id="qrFeedback" style="margin-top: 14px; padding: 10px; border-radius: 6px; display: none; font-size: 13px; font-weight: bold; text-align: center;"></div>
+            <div class="warning-box">
+                ⚠️ <strong>Nota demonstrativa:</strong> A localização física e as medidas dos lotes são dados simulados para apresentação da solução de endereçamento.
             </div>
         </div>
 
     </div>
 
-    <!-- MODAL MOBILE-FRIENDLY -->
+    <!-- MODAL -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <button id="closeModal" class="modal-close">&times;</button>
