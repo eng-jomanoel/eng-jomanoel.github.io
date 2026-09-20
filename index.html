@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base Leste - Empréstimo de Cartas</title>
+    <style>
+        :root {
+            --bg: #1e1e2e;
+            --surface: #313244;
+            --text: #cdd6f4;
+            --primary: #89b4fa;
+            --danger: #f38ba8;
+            --success: #a6e3a1;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+        /* Telas */
+        #login-screen, #app-screen { display: none; }
+        .active { display: block !important; }
+        
+        /* Inputs e Botões */
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 8px;
+            border: none;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input { background-color: var(--surface); color: var(--text); }
+        button { background-color: var(--primary); color: var(--bg); font-weight: bold; cursor: pointer; }
+        button:hover { opacity: 0.9; }
+        button.btn-danger { background-color: var(--danger); }
+        
+        /* Modal */
+        #modal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background-color: var(--bg); padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;
+        }
+        
+        /* Cartas */
+        .card-item {
+            background-color: var(--surface); padding: 15px; border-radius: 8px; margin-top: 10px;
+            display: flex; gap: 15px; align-items: center;
+        }
+        .card-img { width: 60px; border-radius: 4px; }
+        .card-info { flex: 1; }
+        .card-info h4 { margin: 0 0 5px 0; }
+        .card-info p { margin: 0; font-size: 14px; opacity: 0.8; }
+        
+        /* Preview da busca */
+        #card-preview { text-align: center; margin-top: 10px; display: none; }
+        #card-preview img { width: 120px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Tela de Login Simples -->
+    <div id="login-screen">
+        <h2>Identificação - Base Leste</h2>
+        <p>Como você se chama?</p>
+        <input type="text" id="username" placeholder="Seu nome...">
+        <button onclick="entrar()">Entrar</button>
+    </div>
+
+    <!-- Tela Principal do App -->
+    <div id="app-screen">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 id="welcome-msg"></h2>
+            <button onclick="sair()" style="width: auto; padding: 8px 15px; background: transparent; color: var(--danger); border: 1px solid var(--danger);">Sair</button>
+        </div>
+        
+        <button onclick="abrirModal()">+ Registrar Empréstimo</button>
+
+        <h3 style="margin-top: 30px;">Cartas Emprestadas</h3>
+        <div id="lista-cartas">Carregando banco de dados...</div>
+    </div>
+</div>
+
+<!-- Modal de Novo Empréstimo -->
+<div id="modal">
+    <div class="modal-content">
+        <h3>Nova Carta</h3>
+        <input type="text" id="busca-carta" placeholder="Nome da carta em inglês...">
+        <button onclick="buscarCartaYGO()">Buscar Arte</button>
+        
+        <div id="card-preview">
+            <img id="img-preview" src="" alt="Preview">
+            <p id="nome-preview"></p>
+        </div>
+
+        <input type="text" id="emprestado-para" placeholder="Para quem você vai emprestar?">
+        
+        <button onclick="salvarEmprestimo()" id="btn-salvar" style="display: none; background-color: var(--success);">Confirmar Empréstimo</button>
+        <button onclick="fecharModal()" class="btn-danger">Cancelar</button>
+    </div>
+</div>
+
+<script>
+    // SUA URL DO GOOGLE SHEETS AQUI
+    const API_URL = "https://script.google.com/macros/s/AKfycbz1cCgw-Sv_nEKRLylQCbghIOmmUeR_I0PmyvJugZZ8hbY2gO6TZ7QI3fFn9_qx5-_UkA/exec";
+    
+    let usuarioAtual = "";
+    let cartaSelecionada = {};
+
+    // 1. SISTEMA DE LOGIN
+    function checarLogin() {
+        const salvo = localStorage.getItem("bl_user");
+        if (salvo) {
+            usuarioAtual = salvo;
+            document.getElementById("login-screen").classList.remove("active");
+            document.getElementById("app-screen").classList.add("active");
+            document.getElementById("welcome-msg").innerText = "Bem-vindo, " + usuarioAtual;
+            carregarCartas();
+        } else {
+            document.getElementById("login-screen").classList.add("active");
+            document.getElementById("app-screen").classList.remove("active");
+        }
+    }
+
+    function entrar() {
+        const nome = document.getElementById("username").value.trim();
+        if (nome) {
+            localStorage.setItem("bl_user", nome);
+            checarLogin();
+        }
+    }
+
+    function sair() {
+        localStorage.removeItem("bl_user");
+        checarLogin();
+    }
+
+    // 2. COMUNICAÇÃO COM O SHEETS (LER)
+    async function carregarCartas() {
+        document.getElementById("lista-cartas").innerHTML = "Buscando dados...";
+        try {
+            const resposta = await fetch(API_URL);
+            const dados = await resposta.json();
+            
+            if (dados.length === 0) {
+                document.getElementById("lista-cartas").innerHTML = "<p>Nenhuma carta emprestada no momento.</p>";
+                return;
+            }
+
+            let html = "";
+            dados.forEach(item => {
+                // Só mostra botão de devolver se a pessoa logada for a dona da carta
+                const btnDevolver = item.dono === usuarioAtual 
+                    ? `<button class="btn-danger" style="padding: 5px; margin-top: 5px; font-size: 12px;" onclick="devolverCarta('${item.id}')">Marcar como Devolvida</button>` 
+                    : ``;
+
+                html += `
+                <div class="card-item">
+                    <img src="${item.imagem}" class="card-img">
+                    <div class="card-info">
+                        <h4>${item.carta}</h4>
+                        <p><strong>Dono:</strong> ${item.dono}</p>
+                        <p><strong>Com:</strong> ${item.emprestado_para}</p>
+                        <p><strong>Data:</strong> ${item.data}</p>
+                        ${btnDevolver}
+                    </div>
+                </div>`;
+            });
+            document.getElementById("lista-cartas").innerHTML = html;
+        } catch (e) {
+            document.getElementById("lista-cartas").innerHTML = "Erro ao carregar dados.";
+        }
+    }
+
+    // 3. BUSCA NA API DO YGOPRODECK
+    async function buscarCartaYGO() {
+        const nomeCarta = document.getElementById("busca-carta").value;
+        if (!nomeCarta) return;
+
+        try {
+            const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(nomeCarta)}`);
+            const data = await res.json();
+            
+            if (data.data && data.data.length > 0) {
+                const carta = data.data[0];
+                cartaSelecionada = {
+                    nome: carta.name,
+                    imagem: carta.card_images[0].image_url_small
+                };
+                
+                document.getElementById("img-preview").src = cartaSelecionada.imagem;
+                document.getElementById("nome-preview").innerText = cartaSelecionada.nome;
+                document.getElementById("card-preview").style.display = "block";
+                document.getElementById("btn-salvar").style.display = "block";
+            } else {
+                alert("Carta não encontrada!");
+            }
+        } catch (e) {
+            alert("Erro ao buscar a carta.");
+        }
+    }
+
+    // 4. COMUNICAÇÃO COM O SHEETS (ESCREVER/DELETAR)
+    async function salvarEmprestimo() {
+        const emprestadoPara = document.getElementById("emprestado-para").value;
+        if (!emprestadoPara) { alert("Diga com quem a carta vai ficar!"); return; }
+
+        const payload = {
+            acao: "emprestar",
+            carta: cartaSelecionada.nome,
+            dono: usuarioAtual,
+            emprestado_para: emprestadoPara,
+            data: new Date().toLocaleDateString('pt-BR'),
+            imagem: cartaSelecionada.imagem
+        };
+
+        document.getElementById("btn-salvar").innerText = "Salvando...";
+
+        await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" }, // text/plain evita bloqueio de CORS no Google
+            body: JSON.stringify(payload)
+        });
+
+        fecharModal();
+        carregarCartas(); // Recarrega a lista
+    }
+
+    async function devolverCarta(id) {
+        if(!confirm("Confirmar que a carta foi devolvida para você?")) return;
+
+        const payload = { acao: "devolver", id: id };
+        
+        await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        });
+
+        carregarCartas();
+    }
+
+    // Modal Controles
+    function abrirModal() {
+        document.getElementById("modal").style.display = "flex";
+        document.getElementById("busca-carta").value = "";
+        document.getElementById("emprestado-para").value = "";
+        document.getElementById("card-preview").style.display = "none";
+        document.getElementById("btn-salvar").style.display = "none";
+        document.getElementById("btn-salvar").innerText = "Confirmar Empréstimo";
+    }
+    
+    function fecharModal() { document.getElementById("modal").style.display = "none"; }
+
+    // Inicia o app
+    checarLogin();
+</script>
+</body>
+</html>
