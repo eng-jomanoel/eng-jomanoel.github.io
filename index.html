@@ -30,6 +30,36 @@
         #card-preview img { width: 120px; border-radius: 8px; }
         .radio-group { display: flex; gap: 10px; margin-top: 15px; background: var(--surface); padding: 10px; border-radius: 8px; }
         .radio-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 14px; }
+
+        /* Autocomplete */
+#autocomplete-results {
+    background-color: var(--surface);
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 5px;
+    display: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+.autocomplete-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--bg);
+}
+.autocomplete-item:hover {
+    background-color: var(--tab-inactive);
+}
+.autocomplete-item img {
+    width: 35px;
+    border-radius: 4px;
+}
+.autocomplete-item span {
+    font-size: 14px;
+    font-weight: bold;
+}
     </style>
 </head>
 <body>
@@ -70,7 +100,17 @@
 <div id="modal">
     <div class="modal-content">
         <h3>Registrar Carta</h3>
-        <input type="text" id="busca-carta" placeholder="Nome da carta em inglês...">
+        <h3>Registrar Carta</h3>
+<!-- O evento oninput chama a busca toda vez que você digita uma letra -->
+<input type="text" id="busca-carta" placeholder="Digite parte do nome (EN ou PT)..." oninput="buscarAutocomplete()">
+
+<!-- Lista onde os resultados vão aparecer em tempo real -->
+<div id="autocomplete-results"></div>
+
+<div id="card-preview">
+    <img id="img-preview" src="" alt="Preview">
+    <p id="nome-preview"></p>
+</div>
         <button onclick="buscarCartaYGO()">Buscar Arte</button>
         
         <div id="card-preview">
@@ -184,19 +224,93 @@
         document.getElementById("lista-inventario").innerHTML = html || "<p>Seu cofre está vazio.</p>";
     }
 
-    async function buscarCartaYGO() {
-        const nomeCarta = document.getElementById("busca-carta").value;
-        if (!nomeCarta) return;
-        const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(nomeCarta)}`);
-        const data = await res.json();
-        if (data.data && data.data.length > 0) {
-            cartaSelecionada = { nome: data.data[0].name, imagem: data.data[0].card_images[0].image_url_small };
-            document.getElementById("img-preview").src = cartaSelecionada.imagem;
-            document.getElementById("nome-preview").innerText = cartaSelecionada.nome;
-            document.getElementById("card-preview").style.display = "block";
-            document.getElementById("opcoes-registro").style.display = "block";
-        }
+   let timeoutBusca = null;
+
+async function buscarAutocomplete() {
+    const termo = document.getElementById("busca-carta").value.trim();
+    const divResultados = document.getElementById("autocomplete-results");
+    
+    // Só começa a buscar se tiver pelo menos 3 letras
+    if (termo.length < 3) {
+        divResultados.style.display = "none";
+        return;
     }
+
+    // Limpa o timer anterior se a pessoa ainda estiver digitando (Debounce)
+    clearTimeout(timeoutBusca);
+    
+    // Espera a pessoa parar de digitar por 500ms antes de chamar a API
+    timeoutBusca = setTimeout(async () => {
+        divResultados.innerHTML = "<div style='padding:10px; text-align:center;'>Buscando...</div>";
+        divResultados.style.display = "block";
+        
+        try {
+            // Fazemos duas buscas em paralelo: uma em Inglês e uma em Português
+            const [resEN, resPT] = await Promise.all([
+                fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(termo)}`).catch(() => null),
+                fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?language=pt&fname=${encodeURIComponent(termo)}`).catch(() => null)
+            ]);
+            
+            let dataEN = resEN && resEN.ok ? await resEN.json() : { data: [] };
+            let dataPT = resPT && resPT.ok ? await resPT.json() : { data: [] };
+            
+            // Junta os resultados
+            let cartas = [...(dataEN.data || []), ...(dataPT.data || [])];
+            
+            // Remove cartas repetidas (caso a carta tenha o mesmo nome em PT e EN)
+            let cartasUnicas = [];
+            let ids = new Set();
+            for (let c of cartas) {
+                if (!ids.has(c.id)) {
+                    ids.add(c.id);
+                    cartasUnicas.push(c);
+                }
+            }
+
+            // Pega apenas as 8 primeiras cartas para não travar a tela
+            cartasUnicas = cartasUnicas.slice(0, 8);
+
+            if (cartasUnicas.length === 0) {
+                divResultados.innerHTML = "<div style='padding:10px; text-align:center;'>Nenhuma carta encontrada.</div>";
+                return;
+            }
+
+            // Monta a lista visual
+            let html = "";
+            cartasUnicas.forEach(c => {
+                // Trata aspas simples no nome para não quebrar o código
+                const nomeStr = c.name.replace(/'/g, "\\'"); 
+                const imgStr = c.card_images[0].image_url_small;
+                
+                html += `
+                <div class="autocomplete-item" onclick="selecionarCarta('${nomeStr}', '${imgStr}')">
+                    <img src="${imgStr}">
+                    <span>${c.name}</span>
+                </div>`;
+            });
+            
+            divResultados.innerHTML = html;
+
+        } catch (e) {
+            divResultados.innerHTML = "<div style='padding:10px; text-align:center;'>Erro na busca.</div>";
+        }
+    }, 500);
+}
+
+// Quando o usuário clica em uma carta da lista
+function selecionarCarta(nome, imagem) {
+    cartaSelecionada = { nome: nome, imagem: imagem };
+    
+    // Preenche o input com o nome exato e esconde a lista
+    document.getElementById("busca-carta").value = nome;
+    document.getElementById("autocomplete-results").style.display = "none";
+    
+    // Mostra o preview
+    document.getElementById("img-preview").src = imagem;
+    document.getElementById("nome-preview").innerText = nome;
+    document.getElementById("card-preview").style.display = "block";
+    document.getElementById("opcoes-registro").style.display = "block";
+}
 
     function toggleFormulario() {
         const tipo = document.querySelector('input[name="tipo_registro"]:checked').value;
