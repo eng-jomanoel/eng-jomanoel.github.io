@@ -24,38 +24,117 @@
     </div>
   </header>
 
+  <!-- Navigation Tabs -->
+  <nav class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('grid')">🃏 Deck Grid View</button>
+    <button class="tab-btn" onclick="switchTab('table')">📋 Table Role Manager</button>
+    <button class="tab-btn" onclick="switchTab('siding')">🔄 Siding Simulator</button>
+  </nav>
+
   <div class="layout">
-    <!-- Left Column: In-App Deck Builder & Unstacked Deck Grid -->
+    <!-- Left Column: Dynamic Tab Content -->
     <div>
-      <!-- In-App Search Bar -->
-      <div class="panel">
-        <div class="panel-title">
-          <span>In-App Deck Builder (Search & Click to Add)</span>
-          <span class="sub-hint">Max 3 copies per card</span>
+      <!-- TAB 1: GRID VIEW -->
+      <div id="tabGrid" class="tab-content active">
+        <!-- In-App Search Bar -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>In-App Deck Builder (Search & Click to Add)</span>
+            <span class="sub-hint">Max 3 copies per card</span>
+          </div>
+          <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Search any Yu-Gi-Oh! card name..." oninput="debounceSearch()">
+          </div>
+          <div id="searchResults" class="search-results"></div>
         </div>
-        <div class="search-bar">
-          <input type="text" id="searchInput" placeholder="Search any Yu-Gi-Oh! card name (e.g., Grapha, Snoww, Ceruli, Ash Blossom)..." oninput="debounceSearch()">
+
+        <!-- Main Deck Grid -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>Main Deck (<span id="mainCount">0</span> Cards)</span>
+            <span class="sub-hint">Left-Click: Cycle Role • Right-Click: Remove • Click HOPT</span>
+          </div>
+          <div class="legend">
+            <span class="badge" style="background:var(--unassigned)">Unassigned</span>
+            <span class="badge" style="background:var(--starter)">Starter</span>
+            <span class="badge" style="background:var(--combo-a)">Combo A</span>
+            <span class="badge" style="background:var(--combo-b)">Combo B</span>
+            <span class="badge" style="background:var(--extender)">Extender</span>
+            <span class="badge" style="background:var(--handtrap)">Handtrap</span>
+            <span class="badge" style="background:var(--garnet)">Garnet</span>
+          </div>
+          <div id="mainDeckGrid" class="card-grid">
+            <div class="empty-state">Main deck is empty. Import a .YDK or search above.</div>
+          </div>
         </div>
-        <div id="searchResults" class="search-results"></div>
+
+        <!-- Extra Deck Grid -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>Extra Deck (<span id="extraCount">0</span> Cards)</span>
+          </div>
+          <div id="extraDeckGrid" class="card-grid">
+            <div class="empty-state">No Extra Deck cards.</div>
+          </div>
+        </div>
+
+        <!-- Side Deck Grid -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>Side Deck (<span id="sideCount">0</span> Cards)</span>
+          </div>
+          <div id="sideDeckGrid" class="card-grid">
+            <div class="empty-state">No Side Deck cards.</div>
+          </div>
+        </div>
       </div>
 
-      <!-- Main Deck Grid (Unstacked) -->
-      <div class="panel">
-        <div class="panel-title">
-          <span>Main Deck (<span id="deckCount">0</span> Cards)</span>
-          <span class="sub-hint">Left-Click: Cycle Role • Right-Click: Remove 1 Copy • Click HOPT: Toggle</span>
+      <!-- TAB 2: TABLE ROLE MANAGER -->
+      <div id="tabTable" class="tab-content" style="display:none;">
+        <div class="panel">
+          <div class="panel-title">
+            <span>Structured Role & HOPT Manager</span>
+            <span class="sub-hint">Configure all unique deck cards in a clean table view</span>
+          </div>
+          <div class="table-container">
+            <table id="roleTable">
+              <thead>
+                <tr>
+                  <th>Card Name</th>
+                  <th>Copies</th>
+                  <th>Role</th>
+                  <th>HOPT</th>
+                </tr>
+              </thead>
+              <tbody id="roleTableBody">
+                <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No cards loaded.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="legend">
-          <span class="badge" style="background:var(--unassigned)">Unassigned</span>
-          <span class="badge" style="background:var(--starter)">Starter (1-Card)</span>
-          <span class="badge" style="background:var(--combo-a)">Combo Piece A (Outlet)</span>
-          <span class="badge" style="background:var(--combo-b)">Combo Piece B (Payoff)</span>
-          <span class="badge" style="background:var(--extender)">Extender</span>
-          <span class="badge" style="background:var(--handtrap)">Handtrap / Non-Engine</span>
-          <span class="badge" style="background:var(--garnet)">Garnet / Brick</span>
-        </div>
-        <div id="deckGrid" class="card-grid">
-          <div class="empty-state">Your deck is empty. Use the search bar above to add cards or import a .YDK file.</div>
+      </div>
+
+      <!-- TAB 3: SIDING SIMULATOR -->
+      <div id="tabSiding" class="tab-content" style="display:none;">
+        <div class="panel">
+          <div class="panel-title">
+            <span>Interactive Siding Simulator</span>
+            <span class="sub-hint">Click cards to swap between Main Deck and Side Deck for post-side testing</span>
+          </div>
+          <div class="siding-container">
+            <div class="siding-column">
+              <h4>Main Deck (<span id="sideMainCount">0</span>)</h4>
+              <div id="sidingMainList" class="siding-list"></div>
+            </div>
+            <div class="siding-column">
+              <h4>Side Deck (<span id="sideSideCount">0</span>)</h4>
+              <div id="sidingSideList" class="siding-list"></div>
+            </div>
+          </div>
+          <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <button onclick="resetSiding()" class="btn-danger-outline">Reset Siding</button>
+            <span class="sub-hint">Simulation results update automatically on the right panel.</span>
+          </div>
         </div>
       </div>
     </div>

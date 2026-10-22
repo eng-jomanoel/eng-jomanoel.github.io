@@ -18,52 +18,37 @@ const FALLBACK_IMG = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
   </svg>`
 );
 
-let deckCards = [];
+let mainDeckCards = [];
+let extraDeckCards = [];
+let sideDeckCards = [];
+
+// Siding state: tracks card UIDs moved from Main to Side or Side to Main
+let sidedOutUids = new Set();
+let sidedInUids = new Set();
+
 let combos = [];
 let searchTimeout = null;
 
-// Cached full database index so 9-digit Beta IDs (like 100454...) resolve properly
-let fullDbLookupPromise = null;
+// Switch Views / Tabs
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
 
-async function getFullDbMap() {
-  if (!fullDbLookupPromise) {
-    fullDbLookupPromise = fetch('https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes')
-      .then(res => res.json())
-      .then(json => {
-        const map = new Map();
-        (json.data || []).forEach(c => {
-          const defaultImg = (c.card_images && c.card_images[0])
-            ? (c.card_images[0].image_url_small || c.card_images[0].image_url)
-            : `https://images.ygoprodeck.com/images/cards_small/${c.id}.jpg`;
-
-          const entry = { id: Number(c.id), name: c.name, img: defaultImg };
-
-          // 1. Index Official Konami ID
-          map.set(Number(c.id), entry);
-
-          // 2. Index all Alternate Artwork IDs
-          if (c.card_images) {
-            c.card_images.forEach(imgObj => {
-              map.set(Number(imgObj.id), {
-                id: Number(c.id),
-                name: c.name,
-                img: imgObj.image_url_small || imgObj.image_url || defaultImg
-              });
-            });
-          }
-
-          // 3. Index 9-digit Pre-Release Beta IDs (EDOPro / YGO Omega legacy IDs)
-          if (c.misc_info && c.misc_info[0] && c.misc_info[0].beta_id) {
-            map.set(Number(c.misc_info[0].beta_id), entry);
-          }
-        });
-        return map;
-      });
+  if (tabName === 'grid') {
+    document.querySelector('.nav-tabs button:nth-child(1)').classList.add('active');
+    document.getElementById('tabGrid').style.display = 'block';
+  } else if (tabName === 'table') {
+    document.querySelector('.nav-tabs button:nth-child(2)').classList.add('active');
+    document.getElementById('tabTable').style.display = 'block';
+    renderRoleTable();
+  } else if (tabName === 'siding') {
+    document.querySelector('.nav-tabs button:nth-child(3)').classList.add('active');
+    document.getElementById('tabSiding').style.display = 'block';
+    renderSidingLists();
   }
-  return fullDbLookupPromise;
 }
 
-// 1. .YDK File Import
+// 1. .YDK Parser (Handles #main, #extra, !side)
 document.getElementById('ydkInput').addEventListener('change', function (e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -76,88 +61,98 @@ document.getElementById('ydkInput').addEventListener('change', function (e) {
 function parseYDK(text) {
   const lines = text.split(/\r?\n/);
   const mainIds = [];
-  let inMain = false;
+  const extraIds = [];
+  const sideIds = [];
+  let section = 'main';
 
   for (let raw of lines) {
     const line = raw.trim();
-    if (line === '#main') { inMain = true; continue; }
-    if (line === '#extra' || line === '!side') { inMain = false; break; }
-    if (inMain && /^\d+$/.test(line)) {
-      mainIds.push(Number(line));
+    if (line === '#main') { section = 'main'; continue; }
+    if (line === '#extra') { section = 'extra'; continue; }
+    if (line === '!side') { section = 'side'; continue; }
+    if (line.startsWith('#') || line.startsWith('!')) { section = null; continue; }
+    if (/^\d+$/.test(line)) {
+      const numId = Number(line);
+      if (section === 'main') mainIds.push(numId);
+      else if (section === 'extra') extraIds.push(numId);
+      else if (section === 'side') sideIds.push(numId);
+      else mainIds.push(numId);
     }
   }
 
-  if (mainIds.length === 0) {
-    alert("No Main Deck cards found in this .ydk file.");
-    return;
-  }
-  fetchCardsByIds(mainIds);
+  fetchDeckCards(mainIds, extraIds, sideIds);
 }
 
-// 2. Fetch Cards by IDs (Fast Batch + Beta ID Fallback)
-async function fetchCardsByIds(idList) {
-  const grid = document.getElementById('deckGrid');
-  grid.innerHTML = `<div class="empty-state">Fetching card data & resolving passcodes...</div>`;
+// 2. Robust Chunked API Fetching (Prevents URI Too Long & Network Failures)
+async function fetchDeckCards(mainIds, extraIds, sideIds) {
+  const grid = document.getElementById('mainDeckGrid');
+  grid.innerHTML = `<div class="empty-state">Fetching card data from API...</div>`;
 
-  const distinctIds = [...new Set(idList)];
+  const allIds = [...new Set([...mainIds, ...extraIds, ...sideIds])];
   const apiMap = new Map();
 
-  try {
-    // Step A: Try fast direct ID lookup first
-    const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${distinctIds.join(',')}`);
-    if (res.ok) {
-      const json = await res.json();
-      (json.data || []).forEach(c => {
-        const defaultImg = (c.card_images && c.card_images[0])
-          ? (c.card_images[0].image_url_small || c.card_images[0].image_url)
-          : `https://images.ygoprodeck.com/images/cards_small/${c.id}.jpg`;
+  // Chunk IDs in batches of 50 to avoid API URL length limits
+  const chunkSize = 50;
+  for (let i = 0; i < allIds.length; i += chunkSize) {
+    const chunk = allIds.slice(i, i + chunkSize);
+    try {
+      const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${chunk.join(',')}`);
+      if (res.ok) {
+        const json = await res.json();
+        (json.data || []).forEach(c => {
+          const defaultImg = (c.card_images && c.card_images[0])
+            ? (c.card_images[0].image_url_small || c.card_images[0].image_url)
+            : `https://images.ygoprodeck.com/images/cards_small/${c.id}.jpg`;
 
-        apiMap.set(Number(c.id), { id: Number(c.id), name: c.name, img: defaultImg });
-        if (c.card_images) {
-          c.card_images.forEach(imgObj => {
-            apiMap.set(Number(imgObj.id), {
-              id: Number(c.id),
-              name: c.name,
-              img: imgObj.image_url_small || imgObj.image_url || defaultImg
+          const entry = { id: Number(c.id), name: c.name, img: defaultImg };
+          apiMap.set(Number(c.id), entry);
+
+          if (c.card_images) {
+            c.card_images.forEach(imgObj => {
+              apiMap.set(Number(imgObj.id), {
+                id: Number(c.id),
+                name: c.name,
+                img: imgObj.image_url_small || imgObj.image_url || defaultImg
+              });
             });
-          });
-        }
-      });
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("Chunk fetch warning:", err);
     }
-
-    // Step B: If any IDs are still missing (like 100454... beta IDs), resolve via full misc DB
-    const hasMissing = distinctIds.some(id => !apiMap.has(id));
-    let fullMap = null;
-    if (hasMissing) {
-      fullMap = await getFullDbMap();
-    }
-
-    deckCards = idList.map((numId, idx) => {
-      const info = apiMap.get(numId) || (fullMap ? fullMap.get(numId) : null);
-      const officialId = info ? info.id : numId;
-      const name = info ? info.name : `Card #${numId}`;
-      const img = info
-        ? info.img
-        : `https://images.ygoprodeck.com/images/cards_small/${numId}.jpg`;
-
-      return {
-        uid: Date.now() + idx + Math.random(),
-        id: officialId,
-        name,
-        img,
-        role: 'unassigned',
-        hopt: true
-      };
-    });
-
-    sortDeckByName();
-    refreshAll();
-  } catch (err) {
-    grid.innerHTML = `<div class="empty-state" style="color:var(--garnet);">Error loading cards from API. Check your internet connection.</div>`;
   }
+
+  const buildCardObj = (numId, idx) => {
+    const info = apiMap.get(numId);
+    const name = info ? info.name : `Card #${numId}`;
+    const img = info ? info.img : `https://images.ygoprodeck.com/images/cards_small/${numId}.jpg`;
+    return {
+      uid: Date.now() + idx + Math.random(),
+      id: info ? info.id : numId,
+      name,
+      img,
+      role: 'unassigned',
+      hopt: true
+    };
+  };
+
+  mainDeckCards = mainIds.map((id, idx) => buildCardObj(id, idx));
+  extraDeckCards = extraIds.map((id, idx) => buildCardObj(id, idx + 1000));
+  sideDeckCards = sideIds.map((id, idx) => buildCardObj(id, idx + 2000));
+
+  sortDecks();
+  resetSiding();
+  refreshAll();
 }
 
-// 3. In-App Deck Builder Search
+function sortDecks() {
+  mainDeckCards.sort((a, b) => a.name.localeCompare(b.name));
+  extraDeckCards.sort((a, b) => a.name.localeCompare(b.name));
+  sideDeckCards.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// 3. In-App Search Bar
 function debounceSearch() {
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(runCardSearch, 260);
@@ -183,22 +178,19 @@ async function runCardSearch() {
 
     (json.data || []).forEach(card => {
       const type = (card.type || '').toLowerCase();
-      if (type.includes('fusion') || type.includes('synchro') || type.includes('xyz') || type.includes('link') || type.includes('token')) {
-        return;
-      }
-
+      const isExtra = type.includes('fusion') || type.includes('synchro') || type.includes('xyz') || type.includes('link');
       const img = (card.card_images && card.card_images[0])
         ? (card.card_images[0].image_url_small || card.card_images[0].image_url)
         : `https://images.ygoprodeck.com/images/cards_small/${card.id}.jpg`;
 
       const item = document.createElement('div');
       item.className = 'search-item';
-      item.title = `Click to add ${card.name} to Main Deck`;
+      item.title = `Click to add ${card.name}`;
       item.onclick = () => addCardToDeck({
         id: Number(card.id),
         name: card.name,
         img
-      });
+      }, isExtra ? 'extra' : 'main');
 
       item.innerHTML = `
         <img src="${img}" alt="${card.name}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_IMG}';">
@@ -211,16 +203,15 @@ async function runCardSearch() {
   }
 }
 
-function addCardToDeck(cardObj) {
-  const existingCopies = deckCards.filter(c => c.name === cardObj.name);
-  if (existingCopies.length >= 3) {
-    return;
-  }
+function addCardToDeck(cardObj, targetDeck = 'main') {
+  const targetArray = targetDeck === 'extra' ? extraDeckCards : mainDeckCards;
+  const existing = targetArray.filter(c => c.name === cardObj.name);
+  if (existing.length >= 3) return;
 
-  const role = existingCopies.length > 0 ? existingCopies[0].role : 'unassigned';
-  const hopt = existingCopies.length > 0 ? existingCopies[0].hopt : true;
+  const role = existing.length > 0 ? existing.role : 'unassigned';
+  const hopt = existing.length > 0 ? existing.hopt : true;
 
-  deckCards.push({
+  targetArray.push({
     uid: Date.now() + Math.random(),
     id: cardObj.id,
     name: cardObj.name,
@@ -229,30 +220,42 @@ function addCardToDeck(cardObj) {
     hopt
   });
 
-  sortDeckByName();
+  sortDecks();
+  resetSiding();
   refreshAll();
 }
 
-function removeCardCopy(uid) {
-  deckCards = deckCards.filter(c => c.uid !== uid);
+function removeCardCopy(uid, deckType = 'main') {
+  if (deckType === 'main') mainDeckCards = mainDeckCards.filter(c => c.uid !== uid);
+  else if (deckType === 'extra') extraDeckCards = extraDeckCards.filter(c => c.uid !== uid);
+  else if (deckType === 'side') sideDeckCards = sideDeckCards.filter(c => c.uid !== uid);
+
+  resetSiding();
   refreshAll();
 }
 
 function clearDeck() {
-  deckCards = [];
+  mainDeckCards = [];
+  extraDeckCards = [];
+  sideDeckCards = [];
   combos = [];
   document.getElementById('comboList').innerHTML = '';
+  resetSiding();
   refreshAll();
 }
 
 function exportYDK() {
-  if (deckCards.length === 0) {
-    alert("Add cards to your deck before exporting.");
+  if (mainDeckCards.length === 0 && extraDeckCards.length === 0 && sideDeckCards.length === 0) {
+    alert("Deck is empty.");
     return;
   }
   const lines = ['#created by YGO Probability Calculator', '#main'];
-  deckCards.forEach(c => lines.push(String(c.id)));
-  lines.push('#extra', '!side', '');
+  mainDeckCards.forEach(c => lines.push(String(c.id)));
+  lines.push('#extra');
+  extraDeckCards.forEach(c => lines.push(String(c.id)));
+  lines.push('!side');
+  sideDeckCards.forEach(c => lines.push(String(c.id)));
+  lines.push('');
 
   const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
@@ -261,36 +264,39 @@ function exportYDK() {
   a.click();
 }
 
-function sortDeckByName() {
-  deckCards.sort((a, b) => a.name.localeCompare(b.name));
+// 4. Render Grid View
+function renderDeckGrids() {
+  document.getElementById('mainCount').textContent = mainDeckCards.length;
+  document.getElementById('extraCount').textContent = extraDeckCards.length;
+  document.getElementById('sideCount').textContent = sideDeckCards.length;
+
+  renderGridSection('mainDeckGrid', mainDeckCards, 'main');
+  renderGridSection('extraDeckGrid', extraDeckCards, 'extra');
+  renderGridSection('sideDeckGrid', sideDeckCards, 'side');
 }
 
-// 4. Render Unstacked Deck Grid
-function renderDeck() {
-  const grid = document.getElementById('deckGrid');
-  document.getElementById('deckCount').textContent = deckCards.length;
-
-  if (deckCards.length === 0) {
-    grid.innerHTML = `<div class="empty-state">Your deck is empty. Use the search bar above to add cards or import a .YDK file.</div>`;
+function renderGridSection(elementId, cardsArray, deckType) {
+  const grid = document.getElementById(elementId);
+  if (cardsArray.length === 0) {
+    grid.innerHTML = `<div class="empty-state">No cards in this section.</div>`;
     return;
   }
 
   grid.innerHTML = '';
-  deckCards.forEach(card => {
+  cardsArray.forEach(card => {
     const tile = document.createElement('div');
     tile.className = 'card-tile';
     tile.dataset.role = card.role;
     tile.dataset.name = card.name;
 
     tile.onclick = () => cycleRoleByName(card.name);
-
     tile.oncontextmenu = (e) => {
       e.preventDefault();
-      removeCardCopy(card.uid);
+      removeCardCopy(card.uid, deckType);
     };
 
     tile.innerHTML = `
-      <div class="hopt-toggle ${card.hopt ? 'active' : ''}" onclick="toggleHoptByName(event, '${escapeQuotes(card.name)}')" title="Toggle Hard Once Per Turn">HOPT</div>
+      <div class="hopt-toggle ${card.hopt ? 'active' : ''}" onclick="toggleHoptByName(event, '${escapeQuotes(card.name)}')" title="Toggle HOPT">HOPT</div>
       <img src="${card.img}" alt="${card.name}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_IMG}';">
       <div class="role-banner">${ROLE_LABELS[card.role]}</div>
       <div class="card-name" title="${card.name}">${card.name}</div>
@@ -304,47 +310,142 @@ function escapeQuotes(str) {
 }
 
 function cycleRoleByName(cardName) {
-  const first = deckCards.find(c => c.name === cardName);
+  const allCards = [...mainDeckCards, ...extraDeckCards, ...sideDeckCards];
+  const first = allCards.find(c => c.name === cardName);
   if (!first) return;
   const nextRole = ROLES[(ROLES.indexOf(first.role) + 1) % ROLES.length];
 
-  deckCards.forEach(c => {
-    if (c.name === cardName) c.role = nextRole;
+  [mainDeckCards, extraDeckCards, sideDeckCards].forEach(deck => {
+    deck.forEach(c => { if (c.name === cardName) c.role = nextRole; });
   });
 
-  document.querySelectorAll('.card-tile').forEach(tile => {
-    if (tile.dataset.name === cardName) {
-      tile.dataset.role = nextRole;
-      tile.querySelector('.role-banner').textContent = ROLE_LABELS[nextRole];
-    }
-  });
-
-  runSimulation();
+  refreshAll();
 }
 
 function toggleHoptByName(e, cardName) {
   e.stopPropagation();
-  const first = deckCards.find(c => c.name === cardName);
+  const allCards = [...mainDeckCards, ...extraDeckCards, ...sideDeckCards];
+  const first = allCards.find(c => c.name === cardName);
   if (!first) return;
   const nextHopt = !first.hopt;
 
-  deckCards.forEach(c => {
-    if (c.name === cardName) c.hopt = nextHopt;
+  [mainDeckCards, extraDeckCards, sideDeckCards].forEach(deck => {
+    deck.forEach(c => { if (c.name === cardName) c.hopt = nextHopt; });
   });
 
-  document.querySelectorAll('.card-tile').forEach(tile => {
-    if (tile.dataset.name === cardName) {
-      tile.querySelector('.hopt-toggle').classList.toggle('active', nextHopt);
+  refreshAll();
+}
+
+// 5. Table Role Manager View
+function renderRoleTable() {
+  const tbody = document.getElementById('roleTableBody');
+  const map = new Map();
+
+  [...mainDeckCards, ...extraDeckCards, ...sideDeckCards].forEach(c => {
+    if (!map.has(c.name)) {
+      map.set(c.name, { name: c.name, role: c.role, hopt: c.hopt, qty: 1 });
+    } else {
+      map.get(c.name).qty++;
     }
   });
 
+  const uniqueList = Array.from(map.values());
+  if (uniqueList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No cards loaded.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = '';
+  uniqueList.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${item.name}</strong></td>
+      <td>x${item.qty}</td>
+      <td>
+        <select onchange="tableUpdateRole('${escapeQuotes(item.name)}', this.value)">
+          ${ROLES.map(r => `<option value="${r}" ${item.role === r ? 'selected' : ''}>${ROLE_LABELS[r]}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <input type="checkbox" ${item.hopt ? 'checked' : ''} onchange="tableUpdateHopt('${escapeQuotes(item.name)}', this.checked)">
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function tableUpdateRole(cardName, newRole) {
+  [mainDeckCards, extraDeckCards, sideDeckCards].forEach(deck => {
+    deck.forEach(c => { if (c.name === cardName) c.role = newRole; });
+  });
   runSimulation();
 }
 
-// 5. Unique Card Helpers for Dropdowns & Combo Builder
+function tableUpdateHopt(cardName, newHopt) {
+  [mainDeckCards, extraDeckCards, sideDeckCards].forEach(deck => {
+    deck.forEach(c => { if (c.name === cardName) c.hopt = newHopt; });
+  });
+  runSimulation();
+}
+
+// 6. Siding Simulator View
+function resetSiding() {
+  sidedOutUids.clear();
+  sidedInUids.clear();
+  renderSidingLists();
+}
+
+function renderSidingLists() {
+  const mainList = document.getElementById('sidingMainList');
+  const sideList = document.getElementById('sidingSideList');
+
+  const activeMain = mainDeckCards.filter(c => !sidedOutUids.has(c.uid));
+  const activeSide = [...sideDeckCards, ...Array.from(sidedOutUids).map(uid => mainDeckCards.find(c => c.uid === uid)).filter(Boolean)];
+
+  document.getElementById('sideMainCount').textContent = activeMain.length + Array.from(sidedInUids).length;
+  document.getElementById('sideSideCount').textContent = activeSide.length - Array.from(sidedInUids).length;
+
+  mainList.innerHTML = '';
+  [...activeMain, ...Array.from(sidedInUids).map(uid => sideDeckCards.find(c => c.uid === uid)).filter(Boolean)].forEach(card => {
+    const isFromSide = sidedInUids.has(card.uid);
+    const div = document.createElement('div');
+    div.className = 'siding-item';
+    div.style.borderColor = isFromSide ? 'var(--starter)' : 'var(--border)';
+    div.innerHTML = `<span>${card.name}</span> <span style="font-size:0.7rem; color:${isFromSide?'var(--starter)':'var(--text-muted)'}">${isFromSide ? '[Sided In]' : 'Click to Side Out ➔'}</span>`;
+    div.onclick = () => toggleSideCard(card.uid, isFromSide ? 'in' : 'main');
+    mainList.appendChild(div);
+  });
+
+  sideList.innerHTML = '';
+  activeSide.forEach(card => {
+    const isFromMain = sidedOutUids.has(card.uid);
+    const div = document.createElement('div');
+    div.className = 'siding-item';
+    div.style.borderColor = isFromMain ? 'var(--garnet)' : 'var(--border)';
+    div.innerHTML = `<span>${card.name}</span> <span style="font-size:0.7rem; color:${isFromMain?'var(--garnet)':'var(--text-muted)'}">${isFromMain ? '[Sided Out]' : '← Click to Side In'}</span>`;
+    div.onclick = () => toggleSideCard(card.uid, isFromMain ? 'out' : 'side');
+    sideList.appendChild(div);
+  });
+}
+
+function toggleSideCard(uid, origin) {
+  if (origin === 'main') {
+    sidedOutUids.add(uid);
+  } else if (origin === 'out') {
+    sidedOutUids.delete(uid);
+  } else if (origin === 'side') {
+    sidedInUids.add(uid);
+  } else if (origin === 'in') {
+    sidedInUids.delete(uid);
+  }
+  renderSidingLists();
+  runSimulation();
+}
+
+// 7. Unique Card Helpers & Dropdowns
 function getUniqueCardsList() {
   const map = new Map();
-  deckCards.forEach(c => {
+  [...mainDeckCards, ...extraDeckCards, ...sideDeckCards].forEach(c => {
     if (!map.has(c.name)) {
       map.set(c.name, { name: c.name, role: c.role, hopt: c.hopt, qty: 1 });
     } else {
@@ -403,7 +504,6 @@ function addComboRow() {
   if (uniqueList.length === 0) return;
 
   const id = Date.now() + Math.random();
-  // Default to pairing Combo Piece A + Combo Piece B
   const comboObj = { id, slots: ['ROLE:combo_a', 'ROLE:combo_b', ''] };
   combos.push(comboObj);
 
@@ -449,27 +549,26 @@ function removeComboRow(id) {
 }
 
 function refreshAll() {
-  renderDeck();
+  renderDeckGrids();
+  renderRoleTable();
+  renderSidingLists();
   populateDropdowns();
   runSimulation();
 }
 
-// 6. Fast Monte Carlo Simulation Engine (100,000 Trials)
+// 8. Fast Monte Carlo Simulation Engine (100,000 Trials with Siding Support)
 function runSimulation() {
+  // Get active main deck factoring in siding simulator swaps
+  const activeMainCards = mainDeckCards
+    .filter(c => !sidedOutUids.has(c.uid))
+    .concat(Array.from(sidedInUids).map(uid => sideDeckCards.find(c => c.uid === uid)).filter(Boolean));
+
   const handSize = parseInt(document.getElementById('handSizeSelect').value) || 5;
-  if (deckCards.length < handSize) {
+  if (activeMainCards.length < handSize) {
     document.getElementById('playableRate').textContent = '0.0%';
     document.getElementById('brickRate').textContent = '0.0%';
     document.getElementById('targetRate').textContent = '0.0%';
-    document.getElementById('avgStarter').textContent = '0.00';
-    document.getElementById('avgComboA').textContent = '0.00';
-    document.getElementById('avgComboB').textContent = '0.00';
-    document.getElementById('avgExtender').textContent = '0.00';
-    document.getElementById('avgHandtrap').textContent = '0.00';
-    document.getElementById('avgGarnet').textContent = '0.00';
-    document.getElementById('avgHoptDup').textContent = '0.00';
-    document.getElementById('bestHandScore').textContent = 'Score: 0';
-    document.getElementById('bestHandCards').innerHTML = `<li>Add at least ${handSize} cards to simulate hands.</li>`;
+    document.getElementById('bestHandCards').innerHTML = `<li>Active Main Deck needs at least ${handSize} cards.</li>`;
     return;
   }
 
@@ -478,7 +577,7 @@ function runSimulation() {
   const nameToIdx = {};
   uniqueList.forEach((u, i) => nameToIdx[u.name] = i);
 
-  const deck = deckCards.map(c => nameToIdx[c.name]);
+  const deck = activeMainCards.map(c => nameToIdx[c.name]);
   const deckLen = deck.length;
 
   const compiledCombos = combos.map(c => {
