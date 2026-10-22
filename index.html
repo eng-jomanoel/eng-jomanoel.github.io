@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YGO Deck Builder & Probability Calculator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>YGO Deck Builder & Probability Calculator</h1>
+    <div class="top-controls">
+      <label class="file-btn">
+        📂 Import .YDK
+        <input type="file" id="ydkInput" accept=".ydk">
+      </label>
+      <button onclick="exportYDK()">💾 Export .YDK</button>
+      <button class="btn-danger-outline" onclick="clearDeck()">🗑️ Clear Deck</button>
+      <select id="handSizeSelect" onchange="runSimulation()">
+        <option value="5">Going 1st (5 Cards)</option>
+        <option value="6">Going 2nd (6 Cards)</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Left Column: In-App Deck Builder & Unstacked Deck Grid -->
+    <div>
+      <!-- In-App Search Bar -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>In-App Deck Builder (Search & Click to Add)</span>
+          <span class="sub-hint">Max 3 copies per card</span>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="Search any Yu-Gi-Oh! card name (e.g., Grapha, Snoww, Arianna, Ash Blossom)..." oninput="debounceSearch()">
+        </div>
+        <div id="searchResults" class="search-results"></div>
+      </div>
+
+      <!-- Main Deck Grid (Unstacked) -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Main Deck (<span id="deckCount">0</span> Cards)</span>
+          <span class="sub-hint">Left-Click: Cycle Role • Right-Click: Remove 1 Copy • Click HOPT: Toggle</span>
+        </div>
+        <div class="legend">
+          <span class="badge" style="background:var(--unassigned)">Unassigned</span>
+          <span class="badge" style="background:var(--starter)">Starter (1-Card)</span>
+          <span class="badge" style="background:var(--combo-piece)">Combo Piece / Engine</span>
+          <span class="badge" style="background:var(--extender)">Extender</span>
+          <span class="badge" style="background:var(--handtrap)">Handtrap / Non-Engine</span>
+          <span class="badge" style="background:var(--garnet)">Garnet / Brick</span>
+        </div>
+        <div id="deckGrid" class="card-grid">
+          <div class="empty-state">Your deck is empty. Use the search bar above to add cards or import a .YDK file.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Analytics, Hand Criteria & Combo Builder -->
+    <div>
+      <!-- Live Dashboard -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Simulation Results (100k Hands)</span>
+          <span id="simSpeed" class="sim-time">0 ms</span>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="stat-val" id="playableRate">0.0%</div>
+            <div class="stat-label">Playable (Starter or Combo)</div>
+          </div>
+          <div class="stat-box brick">
+            <div class="stat-val" id="brickRate">0.0%</div>
+            <div class="stat-label">Brick Rate (Unplayable/Garnets)</div>
+          </div>
+          <div class="stat-box target">
+            <div class="stat-val" id="targetRate">0.0%</div>
+            <div class="stat-label">Meets Custom Hand Goal Below</div>
+          </div>
+        </div>
+
+        <div class="panel-title" style="margin-top: 12px; font-size: 0.9rem;">Average Opening Hand</div>
+        <div class="avg-list">
+          <div>Usable Starters: <strong id="avgStarter">0.00</strong></div>
+          <div>Combo Pieces: <strong id="avgComboPiece">0.00</strong></div>
+          <div>Usable Extenders: <strong id="avgExtender">0.00</strong></div>
+          <div>Usable Handtraps: <strong id="avgHandtrap">0.00</strong></div>
+          <div>Garnets Drawn: <strong id="avgGarnet">0.00</strong></div>
+          <div>Dead HOPT Dups: <strong id="avgHoptDup" style="color:var(--garnet)">0.00</strong></div>
+        </div>
+      </div>
+
+      <!-- Desired Hand Criteria -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Desired Hand Criteria</span>
+        </div>
+        <div class="req-row">
+          <span>Min Usable Starters:</span>
+          <input type="number" id="reqStarters" value="0" min="0" max="6" onchange="runSimulation()">
+        </div>
+        <div class="req-row">
+          <span>Min Combo Pieces:</span>
+          <input type="number" id="reqComboPieces" value="0" min="0" max="6" onchange="runSimulation()">
+        </div>
+        <div class="req-row">
+          <span>Min Usable Extenders:</span>
+          <input type="number" id="reqExtenders" value="0" min="0" max="6" onchange="runSimulation()">
+        </div>
+        <div class="req-row">
+          <span>Min Usable Handtraps:</span>
+          <input type="number" id="reqHandtraps" value="0" min="0" max="6" onchange="runSimulation()">
+        </div>
+        <div class="req-row">
+          <span>Max Garnets Allowed:</span>
+          <input type="number" id="reqMaxGarnets" value="0" min="0" max="6" onchange="runSimulation()">
+        </div>
+        <hr class="divider">
+        <div class="req-row">
+          <span>Must Draw Specific Card:</span>
+          <select id="reqSpecificCard" style="width: 175px;" onchange="runSimulation()">
+            <option value="">-- Any --</option>
+          </select>
+        </div>
+        <div class="req-row">
+          <span>Min Copies of That Card:</span>
+          <input type="number" id="reqSpecificQty" value="1" min="1" max="3" onchange="runSimulation()">
+        </div>
+      </div>
+
+      <!-- 2 & 3 Card Combo Builder -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>2 & 3-Card Combo Lines</span>
+          <button onclick="addComboRow()">+ Add Combo</button>
+        </div>
+        <p class="sub-hint" style="margin-bottom: 10px;">
+          Pair your <strong>Combo Pieces</strong> with Starters, Extenders, or specific cards. Hands matching any combo below count as <strong>Playable</strong>.
+        </p>
+        <div id="comboList"></div>
+      </div>
+
+      <!-- Best Hand Finder -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Highest-Scoring Hand Found</span>
+          <span id="bestHandScore" class="sim-time">Score: 0</span>
+        </div>
+        <ul id="bestHandCards" class="best-hand-list">
+          <li>Add at least 5 cards to evaluate hands.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
