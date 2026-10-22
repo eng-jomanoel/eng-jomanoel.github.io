@@ -2,246 +2,251 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YGO Deck Builder & Probability Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YGO Deck Builder &amp; Probability Calculator</title>
+  <meta name="description" content="Build a Yu-Gi-Oh! deck and simulate your opening hands: starter rate, brick rate, combo lines and siding.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%83%8F%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
 </head>
 <body>
 
-  <header>
-    <h1>YGO Deck Builder & Probability Calculator</h1>
-    <div class="top-controls">
-      <label class="file-btn">
-        📂 Import .YDK
-        <input type="file" id="ydkInput" accept=".ydk">
-      </label>
-      <button onclick="exportYDK()">💾 Export .YDK</button>
-      <button class="btn-danger-outline" onclick="clearDeck()">🗑️ Clear Deck</button>
-      <select id="handSizeSelect" onchange="runSimulation()">
-        <option value="5">Going 1st (5 Cards)</option>
-        <option value="6">Going 2nd (6 Cards)</option>
-      </select>
+  <div class="drop-overlay" id="dropOverlay" hidden>Drop your .ydk file to import it</div>
+
+  <header class="topbar">
+    <div class="brand">
+      <h1>YGO Deck Builder &amp; Probability Calculator</h1>
+      <p>Simulate your opening hands and see how consistent the deck really is.</p>
+    </div>
+
+    <div class="toolbar">
+      <div class="tool-group">
+        <label class="btn file-btn">Import .YDK
+          <input type="file" id="ydkInput" accept=".ydk,text/plain">
+        </label>
+        <button type="button" class="btn" id="exportBtn">Export .YDK</button>
+        <button type="button" class="btn btn-accent" id="shareBtn">Copy share link</button>
+      </div>
+
+      <div class="tool-group">
+        <select id="savedDecks" aria-label="Saved decks"></select>
+        <button type="button" class="btn" id="saveDeckBtn">Save deck</button>
+        <button type="button" class="btn btn-ghost-danger" id="deleteDeckBtn">Delete</button>
+      </div>
+
+      <div class="tool-group">
+        <select id="handSize" aria-label="Hand size">
+          <option value="5">Going 1st (5 cards)</option>
+          <option value="6">Going 2nd (6 cards)</option>
+        </select>
+        <select id="trials" aria-label="Simulated hands">
+          <option value="50000">50k hands</option>
+          <option value="100000" selected>100k hands</option>
+          <option value="500000">500k hands</option>
+        </select>
+        <button type="button" class="btn btn-danger" id="clearBtn">Clear deck</button>
+      </div>
     </div>
   </header>
 
-  <!-- Navigation Tabs -->
-  <nav class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('grid')">🃏 Deck Grid View</button>
-    <button class="tab-btn" onclick="switchTab('table')">📋 Table Role Manager</button>
-    <button class="tab-btn" onclick="switchTab('siding')">🔄 Siding Simulator</button>
-  </nav>
+  <div class="status" id="statusBar" hidden></div>
 
   <div class="layout">
-    <!-- Left Column: Dynamic Tab Content -->
-    <div>
-      <!-- TAB 1: GRID VIEW -->
-      <div id="tabGrid" class="tab-content active">
-        <!-- In-App Search Bar -->
+
+    <!-- ============ LEFT: deck views ============ -->
+    <main class="main-col">
+      <nav class="tabs" role="tablist" aria-label="Deck views">
+        <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="grid">Deck grid</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="table">Role table</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="siding">Siding</button>
+      </nav>
+
+      <!-- ---- Deck grid ---- -->
+      <section id="tab-grid" class="tab-pane" role="tabpanel">
         <div class="panel">
-          <div class="panel-title">
-            <span>In-App Deck Builder (Search & Click to Add)</span>
-            <span class="sub-hint">Max 3 copies per card</span>
+          <div class="panel-head">
+            <h2>Add cards</h2>
+            <label class="inline-field">Add to
+              <select id="addTo">
+                <option value="auto">Main / Extra (automatic)</option>
+                <option value="side">Side deck</option>
+              </select>
+            </label>
           </div>
-          <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="Search any Yu-Gi-Oh! card name..." oninput="debounceSearch()">
-          </div>
+          <input type="search" id="searchInput" class="search-input" placeholder="Search by card name, or paste a card ID" autocomplete="off" spellcheck="false">
+          <p class="hint" id="searchStatus" aria-live="polite"></p>
           <div id="searchResults" class="search-results"></div>
         </div>
 
-        <!-- Main Deck Grid -->
         <div class="panel">
-          <div class="panel-title">
-            <span>Main Deck (<span id="mainCount">0</span> Cards)</span>
-            <span class="sub-hint">Left-Click: Cycle Role • Right-Click: Remove • Click HOPT</span>
+          <div class="panel-head">
+            <h2>Main deck <span class="chip" id="mainCount">0</span></h2>
+            <button type="button" class="btn btn-small" id="resetRolesBtn">Reset roles</button>
           </div>
-          <div class="legend">
-            <span class="badge" style="background:var(--unassigned)">Unassigned</span>
-            <span class="badge" style="background:var(--starter)">Starter</span>
-            <span class="badge" style="background:var(--combo-a)">Combo A</span>
-            <span class="badge" style="background:var(--combo-b)">Combo B</span>
-            <span class="badge" style="background:var(--extender)">Extender</span>
-            <span class="badge" style="background:var(--handtrap)">Handtrap</span>
-            <span class="badge" style="background:var(--garnet)">Garnet</span>
+          <div class="brush-row">
+            <div class="legend" id="legend"></div>
+            <p class="hint" id="brushHint"></p>
           </div>
-          <div id="mainDeckGrid" class="card-grid">
-            <div class="empty-state">Main deck is empty. Import a .YDK or search above.</div>
-          </div>
+          <div id="mainGrid" class="card-grid"></div>
         </div>
 
-        <!-- Extra Deck Grid -->
         <div class="panel">
-          <div class="panel-title">
-            <span>Extra Deck (<span id="extraCount">0</span> Cards)</span>
-          </div>
-          <div id="extraDeckGrid" class="card-grid">
-            <div class="empty-state">No Extra Deck cards.</div>
-          </div>
+          <div class="panel-head"><h2>Extra deck <span class="chip" id="extraCount">0</span></h2></div>
+          <div id="extraGrid" class="card-grid"></div>
         </div>
 
-        <!-- Side Deck Grid -->
         <div class="panel">
-          <div class="panel-title">
-            <span>Side Deck (<span id="sideCount">0</span> Cards)</span>
-          </div>
-          <div id="sideDeckGrid" class="card-grid">
-            <div class="empty-state">No Side Deck cards.</div>
-          </div>
+          <div class="panel-head"><h2>Side deck <span class="chip" id="sideCount">0</span></h2></div>
+          <div id="sideGrid" class="card-grid"></div>
         </div>
-      </div>
+      </section>
 
-      <!-- TAB 2: TABLE ROLE MANAGER -->
-      <div id="tabTable" class="tab-content" style="display:none;">
+      <!-- ---- Role table ---- -->
+      <section id="tab-table" class="tab-pane" role="tabpanel" hidden>
         <div class="panel">
-          <div class="panel-title">
-            <span>Structured Role & HOPT Manager</span>
-            <span class="sub-hint">Configure all unique deck cards in a clean table view</span>
+          <div class="panel-head">
+            <h2>Roles and HOPT <span class="chip" id="tableCount">0 cards</span></h2>
           </div>
-          <div class="table-container">
-            <table id="roleTable">
+          <div class="table-tools">
+            <input type="search" id="tableFilter" class="search-input" placeholder="Filter by name" autocomplete="off">
+            <label class="check"><input type="checkbox" id="onlyUnassigned"> <span>Only unassigned</span></label>
+          </div>
+          <p class="hint">Extra deck cards don't need a role, so they're not listed here.</p>
+          <div class="table-wrap">
+            <table class="role-table">
               <thead>
-                <tr>
-                  <th>Card Name</th>
-                  <th>Copies</th>
-                  <th>Role</th>
-                  <th>HOPT</th>
-                </tr>
+                <tr><th>Card</th><th>Copies</th><th>Role</th><th>HOPT</th></tr>
               </thead>
-              <tbody id="roleTableBody">
-                <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No cards loaded.</td></tr>
-              </tbody>
+              <tbody id="roleTableBody"></tbody>
             </table>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- TAB 3: SIDING SIMULATOR -->
-      <div id="tabSiding" class="tab-content" style="display:none;">
+      <!-- ---- Siding ---- -->
+      <section id="tab-siding" class="tab-pane" role="tabpanel" hidden>
         <div class="panel">
-          <div class="panel-title">
-            <span>Interactive Siding Simulator</span>
-            <span class="sub-hint">Click cards to swap between Main Deck and Side Deck for post-side testing</span>
+          <div class="panel-head">
+            <h2>Siding simulator</h2>
+            <button type="button" class="btn btn-ghost-danger btn-small" id="resetSidingBtn">Reset siding</button>
           </div>
-          <div class="siding-container">
-            <div class="siding-column">
-              <h4>Main Deck (<span id="sideMainCount">0</span>)</h4>
-              <div id="sidingMainList" class="siding-list"></div>
+          <p class="hint">Click a card to swap it between main and side. The results panel compares the sided deck against your original list.</p>
+          <p class="hint" id="sidingSummary"></p>
+          <div class="siding-cols">
+            <div class="siding-col">
+              <h3>Main deck <span class="chip" id="sideMainCount">0</span></h3>
+              <div id="sidingMainList" class="card-grid small"></div>
             </div>
-            <div class="siding-column">
-              <h4>Side Deck (<span id="sideSideCount">0</span>)</h4>
-              <div id="sidingSideList" class="siding-list"></div>
+            <div class="siding-col">
+              <h3>Side deck <span class="chip" id="sideSideCount">0</span></h3>
+              <div id="sidingSideList" class="card-grid small"></div>
             </div>
-          </div>
-          <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <button onclick="resetSiding()" class="btn-danger-outline">Reset Siding</button>
-            <span class="sub-hint">Simulation results update automatically on the right panel.</span>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- Right Column: Analytics, Hand Criteria & Combo Builder -->
-    <div>
-      <!-- Live Dashboard -->
-      <div class="panel">
-        <div class="panel-title">
-          <span>Simulation Results (100k Hands)</span>
-          <span id="simSpeed" class="sim-time">0 ms</span>
+      <details class="panel help">
+        <summary>How this works</summary>
+        <div class="help-body">
+          <p><strong>Roles.</strong> Give each main or side deck card a role. A <em>Starter</em> can get your play going alone. <em>Combo A</em> and <em>Combo B</em> are pieces that only work together. An <em>Extender</em> needs a starter first. A <em>Handtrap</em> is interaction you want in hand. A <em>Garnet</em> is a card you never want to draw.</p>
+          <p><strong>Fast assigning.</strong> Pick a role in the legend to use it as a brush, then click cards to paint them. With no brush selected, clicking a card cycles through the roles.</p>
+          <p><strong>HOPT.</strong> If a card is hard once per turn, a second copy in the same hand is dead: it doesn't count as a starter, extender or combo piece.</p>
+          <p><strong>Playable and brick.</strong> A hand is playable with at least one starter, or when any combo line matches. It's a brick when it isn't playable, or when it holds as many garnets as your brick limit.</p>
+          <p><strong>Simulation.</strong> The calculator shuffles your main deck and draws a hand for every simulated trial. The random seed is fixed so the same deck always shows the same numbers. Press the reroll button to see how much the result moves.</p>
+          <p><strong>Saving.</strong> Your deck, roles and combos save automatically in this browser. Roles are remembered per card, so cards you already tagged keep their role in other decks. Use "Copy share link" to send your deck with roles and combos to a friend.</p>
         </div>
+      </details>
+    </main>
+
+    <!-- ============ RIGHT: analytics ============ -->
+    <aside class="sidebar">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Results</h2>
+          <span class="sim-meta"><span id="simSpeed">0 ms</span>
+            <button type="button" class="btn btn-small btn-icon" id="rerollBtn" title="Run again with a new random seed" aria-label="Reroll simulation">&#8635;</button>
+          </span>
+        </div>
+        <p class="hint" id="simNote"></p>
 
         <div class="stat-grid">
-          <div class="stat-box">
-            <div class="stat-val" id="playableRate">0.0%</div>
-            <div class="stat-label">Playable (Starter or Combo)</div>
+          <div class="stat good">
+            <div class="stat-val"><span id="playableRate">0.0%</span><span class="delta" id="playableDelta"></span></div>
+            <div class="stat-label">Playable (starter or combo)</div>
           </div>
-          <div class="stat-box brick">
-            <div class="stat-val" id="brickRate">0.0%</div>
-            <div class="stat-label">Brick Rate (Unplayable/Garnets)</div>
+          <div class="stat bad">
+            <div class="stat-val"><span id="brickRate">0.0%</span><span class="delta" id="brickDelta"></span></div>
+            <div class="stat-label">Brick</div>
           </div>
-          <div class="stat-box target">
-            <div class="stat-val" id="targetRate">0.0%</div>
-            <div class="stat-label">Meets Custom Hand Goal Below</div>
+          <div class="stat gold wide">
+            <div class="stat-val"><span id="targetRate">0.0%</span><span class="delta" id="targetDelta"></span></div>
+            <div class="stat-label">Meets your hand goal</div>
           </div>
         </div>
 
-        <div class="panel-title" style="margin-top: 12px; font-size: 0.9rem;">Average Opening Hand</div>
-        <div class="avg-list">
-          <div>Usable Starters: <strong id="avgStarter">0.00</strong></div>
-          <div>Combo Piece A: <strong id="avgComboA">0.00</strong></div>
-          <div>Combo Piece B: <strong id="avgComboB">0.00</strong></div>
-          <div>Usable Extenders: <strong id="avgExtender">0.00</strong></div>
-          <div>Usable Handtraps: <strong id="avgHandtrap">0.00</strong></div>
-          <div>Garnets Drawn: <strong id="avgGarnet">0.00</strong></div>
-          <div style="grid-column: span 2;">Dead HOPT Dups: <strong id="avgHoptDup" style="color:var(--garnet)">0.00</strong></div>
-        </div>
+        <h3 class="sub-title">Average opening hand</h3>
+        <div class="avg-table" id="avgList"></div>
       </div>
 
-      <!-- Desired Hand Criteria -->
       <div class="panel">
-        <div class="panel-title">
-          <span>Desired Hand Criteria</span>
+        <div class="panel-head"><h2>Hand goal</h2></div>
+        <div class="crit-grid">
+          <label>Min starters <input type="number" data-crit="starters" min="0" max="6" value="0"></label>
+          <label>Min combo A <input type="number" data-crit="comboA" min="0" max="6" value="0"></label>
+          <label>Min combo B <input type="number" data-crit="comboB" min="0" max="6" value="0"></label>
+          <label>Min extenders <input type="number" data-crit="extenders" min="0" max="6" value="0"></label>
+          <label>Min handtraps <input type="number" data-crit="handtraps" min="0" max="6" value="0"></label>
+          <label>Max garnets <input type="number" data-crit="maxGarnets" min="0" max="6" value="6"></label>
         </div>
-        <div class="req-row">
-          <span>Min Usable Starters:</span>
-          <input type="number" id="reqStarters" value="0" min="0" max="6" onchange="runSimulation()">
+        <div class="crit-specific">
+          <label>Must draw
+            <select id="critSpecific" data-crit="specific"><option value="">Any card</option></select>
+          </label>
+          <label>Copies <input type="number" data-crit="specificQty" min="1" max="3" value="1"></label>
         </div>
-        <div class="req-row">
-          <span>Min Combo Piece A:</span>
-          <input type="number" id="reqComboA" value="0" min="0" max="6" onchange="runSimulation()">
-        </div>
-        <div class="req-row">
-          <span>Min Combo Piece B:</span>
-          <input type="number" id="reqComboB" value="0" min="0" max="6" onchange="runSimulation()">
-        </div>
-        <div class="req-row">
-          <span>Min Usable Extenders:</span>
-          <input type="number" id="reqExtenders" value="0" min="0" max="6" onchange="runSimulation()">
-        </div>
-        <div class="req-row">
-          <span>Min Usable Handtraps:</span>
-          <input type="number" id="reqHandtraps" value="0" min="0" max="6" onchange="runSimulation()">
-        </div>
-        <div class="req-row">
-          <span>Max Garnets Allowed:</span>
-          <input type="number" id="reqMaxGarnets" value="0" min="0" max="6" onchange="runSimulation()">
-        </div>
-        <hr class="divider">
-        <div class="req-row">
-          <span>Must Draw Specific Card:</span>
-          <select id="reqSpecificCard" style="width: 175px;" onchange="runSimulation()">
-            <option value="">-- Any --</option>
-          </select>
-        </div>
-        <div class="req-row">
-          <span>Min Copies of That Card:</span>
-          <input type="number" id="reqSpecificQty" value="1" min="1" max="3" onchange="runSimulation()">
-        </div>
+        <label class="crit-brick">Count as brick at
+          <input type="number" data-crit="brickGarnets" min="1" max="6" value="2"> garnets
+        </label>
       </div>
 
-      <!-- 2 & 3 Card Combo Builder -->
       <div class="panel">
-        <div class="panel-title">
-          <span>2 & 3-Card Combo Lines</span>
-          <button onclick="addComboRow()">+ Add Combo</button>
+        <div class="panel-head">
+          <h2>Combo lines</h2>
+          <button type="button" class="btn btn-small" id="addComboBtn">Add combo</button>
         </div>
-        <p class="sub-hint" style="margin-bottom: 10px;">
-          Defaults to <strong>[Any Combo A] + [Any Combo B]</strong>. Hands matching any combo line below count as <strong>Playable</strong>.
-        </p>
+        <p class="hint">A hand that matches any line counts as playable. Each line needs every card or role you pick, using different cards.</p>
         <div id="comboList"></div>
       </div>
 
-      <!-- Best Hand Finder -->
       <div class="panel">
-        <div class="panel-title">
-          <span>Highest-Scoring Hand Found</span>
-          <span id="bestHandScore" class="sim-time">Score: 0</span>
+        <div class="panel-head">
+          <h2>Test hand</h2>
+          <button type="button" class="btn btn-small btn-accent" id="drawHandBtn">Draw a hand</button>
         </div>
-        <ul id="bestHandCards" class="best-hand-list">
-          <li>Add at least 5 cards to evaluate hands.</li>
-        </ul>
+        <div id="testHand" class="hand"></div>
+        <p class="hint" id="testHandVerdict">Draw a random hand from the deck as it stands now.</p>
+
+        <h3 class="sub-title">Best hand found <span class="sim-meta" id="bestHandScore"></span></h3>
+        <div id="bestHand" class="hand"></div>
       </div>
-    </div>
+    </aside>
   </div>
 
-  <script src="app.js"></script>
+  <footer class="footer">
+    Card data and images come from <a href="https://ygoprodeck.com/" target="_blank" rel="noopener">YGOPRODeck</a>.
+    Yu-Gi-Oh! is a trademark of Konami. This is a fan project and isn't affiliated with Konami.
+  </footer>
+
+  <div class="mini-bar" id="miniBar" aria-hidden="true">
+    <span><b id="miniPlayable">0.0%</b> playable</span>
+    <span><b id="miniBrick">0.0%</b> brick</span>
+    <span><b id="miniTarget">0.0%</b> goal</span>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <div class="preview" id="preview" hidden><img alt=""><span></span></div>
 </body>
 </html>
