@@ -1,15 +1,15 @@
-const ROLES = ['unassigned', 'starter', 'combo_piece', 'extender', 'handtrap', 'garnet'];
+const ROLES = ['unassigned', 'starter', 'combo_a', 'combo_b', 'extender', 'handtrap', 'garnet'];
 const ROLE_LABELS = {
   unassigned: 'Unassigned',
   starter: 'Starter',
-  combo_piece: 'Combo Piece',
+  combo_a: 'Combo A',
+  combo_b: 'Combo B',
   extender: 'Extender',
   handtrap: 'Handtrap',
   garnet: 'Garnet'
 };
-const ROLE_MAP = { unassigned: 0, starter: 1, combo_piece: 2, extender: 3, handtrap: 4, garnet: 5 };
+const ROLE_MAP = { unassigned: 0, starter: 1, combo_a: 2, combo_b: 3, extender: 4, handtrap: 5, garnet: 6 };
 
-// Card back SVG fallback so broken image icons never happen
 const FALLBACK_IMG = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="421" height="614" viewBox="0 0 421 614">
     <rect width="100%" height="100%" fill="#00212b"/>
@@ -18,10 +18,50 @@ const FALLBACK_IMG = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
   </svg>`
 );
 
-// deckCards holds every individual card copy unstacked: { uid, id, name, img, role, hopt }
 let deckCards = [];
 let combos = [];
 let searchTimeout = null;
+
+// Cached full database index so 9-digit Beta IDs (like 100454...) resolve properly
+let fullDbLookupPromise = null;
+
+async function getFullDbMap() {
+  if (!fullDbLookupPromise) {
+    fullDbLookupPromise = fetch('https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes')
+      .then(res => res.json())
+      .then(json => {
+        const map = new Map();
+        (json.data || []).forEach(c => {
+          const defaultImg = (c.card_images && c.card_images[0])
+            ? (c.card_images[0].image_url_small || c.card_images[0].image_url)
+            : `https://images.ygoprodeck.com/images/cards_small/${c.id}.jpg`;
+
+          const entry = { id: Number(c.id), name: c.name, img: defaultImg };
+
+          // 1. Index Official Konami ID
+          map.set(Number(c.id), entry);
+
+          // 2. Index all Alternate Artwork IDs
+          if (c.card_images) {
+            c.card_images.forEach(imgObj => {
+              map.set(Number(imgObj.id), {
+                id: Number(c.id),
+                name: c.name,
+                img: imgObj.image_url_small || imgObj.image_url || defaultImg
+              });
+            });
+          }
+
+          // 3. Index 9-digit Pre-Release Beta IDs (EDOPro / YGO Omega legacy IDs)
+          if (c.misc_info && c.misc_info[0] && c.misc_info[0].beta_id) {
+            map.set(Number(c.misc_info[0].beta_id), entry);
+          }
+        });
+        return map;
+      });
+  }
+  return fullDbLookupPromise;
+}
 
 // 1. .YDK File Import
 document.getElementById('ydkInput').addEventListener('change', function (e) {
@@ -43,7 +83,6 @@ function parseYDK(text) {
     if (line === '#main') { inMain = true; continue; }
     if (line === '#extra' || line === '!side') { inMain = false; break; }
     if (inMain && /^\d+$/.test(line)) {
-      // Normalize passcodes using Number() to fix leading zero mismatches
       mainIds.push(Number(line));
     }
   }
@@ -55,42 +94,55 @@ function parseYDK(text) {
   fetchCardsByIds(mainIds);
 }
 
-// 2. Fetch Cards by IDs
+// 2. Fetch Cards by IDs (Fast Batch + Beta ID Fallback)
 async function fetchCardsByIds(idList) {
   const grid = document.getElementById('deckGrid');
-  grid.innerHTML = `<div class="empty-state">Fetching card data & images from YGOPRODeck API...</div>`;
+  grid.innerHTML = `<div class="empty-state">Fetching card data & resolving passcodes...</div>`;
 
   const distinctIds = [...new Set(idList)];
+  const apiMap = new Map();
 
   try {
+    // Step A: Try fast direct ID lookup first
     const res = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${distinctIds.join(',')}`);
-    const json = await res.json();
-    const apiMap = {};
+    if (res.ok) {
+      const json = await res.json();
+      (json.data || []).forEach(c => {
+        const defaultImg = (c.card_images && c.card_images[0])
+          ? (c.card_images[0].image_url_small || c.card_images[0].image_url)
+          : `https://images.ygoprodeck.com/images/cards_small/${c.id}.jpg`;
 
-    if (json.data) {
-      json.data.forEach(c => {
-        apiMap[Number(c.id)] = c;
+        apiMap.set(Number(c.id), { id: Number(c.id), name: c.name, img: defaultImg });
         if (c.card_images) {
           c.card_images.forEach(imgObj => {
-            apiMap[Number(imgObj.id)] = {
-              ...c,
-              preferred_img: imgObj.image_url_small || imgObj.image_url
-            };
+            apiMap.set(Number(imgObj.id), {
+              id: Number(c.id),
+              name: c.name,
+              img: imgObj.image_url_small || imgObj.image_url || defaultImg
+            });
           });
         }
       });
     }
 
+    // Step B: If any IDs are still missing (like 100454... beta IDs), resolve via full misc DB
+    const hasMissing = distinctIds.some(id => !apiMap.has(id));
+    let fullMap = null;
+    if (hasMissing) {
+      fullMap = await getFullDbMap();
+    }
+
     deckCards = idList.map((numId, idx) => {
-      const info = apiMap[numId];
+      const info = apiMap.get(numId) || (fullMap ? fullMap.get(numId) : null);
+      const officialId = info ? info.id : numId;
       const name = info ? info.name : `Card #${numId}`;
       const img = info
-        ? (info.preferred_img || info.card_images[0].image_url_small || info.card_images[0].image_url)
-        : FALLBACK_IMG;
+        ? info.img
+        : `https://images.ygoprodeck.com/images/cards_small/${numId}.jpg`;
 
       return {
         uid: Date.now() + idx + Math.random(),
-        id: numId,
+        id: officialId,
         name,
         img,
         role: 'unassigned',
@@ -137,7 +189,7 @@ async function runCardSearch() {
 
       const img = (card.card_images && card.card_images[0])
         ? (card.card_images[0].image_url_small || card.card_images[0].image_url)
-        : FALLBACK_IMG;
+        : `https://images.ygoprodeck.com/images/cards_small/${card.id}.jpg`;
 
       const item = document.createElement('div');
       item.className = 'search-item';
@@ -162,10 +214,9 @@ async function runCardSearch() {
 function addCardToDeck(cardObj) {
   const existingCopies = deckCards.filter(c => c.name === cardObj.name);
   if (existingCopies.length >= 3) {
-    return; // Max 3 copies rule
+    return;
   }
 
-  // Only inherit if a copy is already in the current active deck; otherwise default to unassigned
   const role = existingCopies.length > 0 ? existingCopies[0].role : 'unassigned';
   const hopt = existingCopies.length > 0 ? existingCopies[0].hopt : true;
 
@@ -231,10 +282,8 @@ function renderDeck() {
     tile.dataset.role = card.role;
     tile.dataset.name = card.name;
 
-    // Left-click cycles role for all copies of this card in the current deck
     tile.onclick = () => cycleRoleByName(card.name);
 
-    // Right-click removes this single copy
     tile.oncontextmenu = (e) => {
       e.preventDefault();
       removeCardCopy(card.uid);
@@ -334,7 +383,8 @@ function getComboOptionsHTML(includeEmpty, uniqueList) {
   let html = includeEmpty ? `<option value="">-- Optional 3rd --</option>` : '';
   html += `
     <optgroup label="Generic Roles">
-      <option value="ROLE:combo_piece">[Any Combo Piece]</option>
+      <option value="ROLE:combo_a">[Any Combo Piece A]</option>
+      <option value="ROLE:combo_b">[Any Combo Piece B]</option>
       <option value="ROLE:starter">[Any Starter]</option>
       <option value="ROLE:extender">[Any Extender]</option>
       <option value="ROLE:handtrap">[Any Handtrap]</option>
@@ -353,7 +403,8 @@ function addComboRow() {
   if (uniqueList.length === 0) return;
 
   const id = Date.now() + Math.random();
-  const comboObj = { id, slots: ['ROLE:combo_piece', 'ROLE:combo_piece', ''] };
+  // Default to pairing Combo Piece A + Combo Piece B
+  const comboObj = { id, slots: ['ROLE:combo_a', 'ROLE:combo_b', ''] };
   combos.push(comboObj);
 
   const container = document.getElementById('comboList');
@@ -411,7 +462,8 @@ function runSimulation() {
     document.getElementById('brickRate').textContent = '0.0%';
     document.getElementById('targetRate').textContent = '0.0%';
     document.getElementById('avgStarter').textContent = '0.00';
-    document.getElementById('avgComboPiece').textContent = '0.00';
+    document.getElementById('avgComboA').textContent = '0.00';
+    document.getElementById('avgComboB').textContent = '0.00';
     document.getElementById('avgExtender').textContent = '0.00';
     document.getElementById('avgHandtrap').textContent = '0.00';
     document.getElementById('avgGarnet').textContent = '0.00';
@@ -440,7 +492,8 @@ function runSimulation() {
   }).filter(arr => arr.length > 0);
 
   const reqS = parseInt(document.getElementById('reqStarters').value) || 0;
-  const reqC = parseInt(document.getElementById('reqComboPieces').value) || 0;
+  const reqCA = parseInt(document.getElementById('reqComboA').value) || 0;
+  const reqCB = parseInt(document.getElementById('reqComboB').value) || 0;
   const reqE = parseInt(document.getElementById('reqExtenders').value) || 0;
   const reqH = parseInt(document.getElementById('reqHandtraps').value) || 0;
   const reqMaxG = parseInt(document.getElementById('reqMaxGarnets').value);
@@ -450,7 +503,7 @@ function runSimulation() {
 
   const TRIALS = 100000;
   let playableCount = 0, brickCount = 0, targetMatchCount = 0;
-  let sumS = 0, sumC = 0, sumE = 0, sumH = 0, sumG = 0, sumDups = 0;
+  let sumS = 0, sumCA = 0, sumCB = 0, sumE = 0, sumH = 0, sumG = 0, sumDups = 0;
   let bestScore = -9999;
   let bestHandSnapshot = [];
 
@@ -475,7 +528,7 @@ function runSimulation() {
       handIndices[i] = tmp;
     }
 
-    let uS = 0, uC = 0, uE = 0, uH = 0, garnets = 0, hoptDups = 0, score = 0;
+    let uS = 0, uCA = 0, uCB = 0, uE = 0, uH = 0, garnets = 0, hoptDups = 0, score = 0;
 
     for (let i = 0; i < handSize; i++) {
       const uIdx = handIndices[i];
@@ -494,10 +547,11 @@ function runSimulation() {
 
       const rCode = roleArr[uIdx];
       if (rCode === 1) { uS++; score += 12; }
-      else if (rCode === 2) { uC++; score += 4; }
-      else if (rCode === 3) { uE++; score += 6; }
-      else if (rCode === 4) { uH++; score += 7; }
-      else if (rCode === 5) { garnets++; score -= 12; }
+      else if (rCode === 2) { uCA++; score += 4; }
+      else if (rCode === 3) { uCB++; score += 4; }
+      else if (rCode === 4) { uE++; score += 6; }
+      else if (rCode === 5) { uH++; score += 7; }
+      else if (rCode === 6) { garnets++; score -= 12; }
     }
 
     let hasCombo = false;
@@ -538,7 +592,7 @@ function runSimulation() {
     if (isPlayable) playableCount++;
     if (isBrick) brickCount++;
 
-    let meetsTarget = (uS >= reqS) && (uC >= reqC) && (uE >= reqE) && (uH >= reqH) && (garnets <= reqMaxG);
+    let meetsTarget = (uS >= reqS) && (uCA >= reqCA) && (uCB >= reqCB) && (uE >= reqE) && (uH >= reqH) && (garnets <= reqMaxG);
     if (meetsTarget && reqSpecIdx >= 0) {
       const cInHand = (seenStamp[reqSpecIdx] === t) ? drawnCounts[reqSpecIdx] : 0;
       if (cInHand < reqSpecQty) meetsTarget = false;
@@ -546,7 +600,8 @@ function runSimulation() {
     if (meetsTarget) targetMatchCount++;
 
     sumS += uS;
-    sumC += uC;
+    sumCA += uCA;
+    sumCB += uCB;
     sumE += uE;
     sumH += uH;
     sumG += garnets;
@@ -566,7 +621,8 @@ function runSimulation() {
   document.getElementById('targetRate').textContent = `${((targetMatchCount / TRIALS) * 100).toFixed(1)}%`;
 
   document.getElementById('avgStarter').textContent = (sumS / TRIALS).toFixed(2);
-  document.getElementById('avgComboPiece').textContent = (sumC / TRIALS).toFixed(2);
+  document.getElementById('avgComboA').textContent = (sumCA / TRIALS).toFixed(2);
+  document.getElementById('avgComboB').textContent = (sumCB / TRIALS).toFixed(2);
   document.getElementById('avgExtender').textContent = (sumE / TRIALS).toFixed(2);
   document.getElementById('avgHandtrap').textContent = (sumH / TRIALS).toFixed(2);
   document.getElementById('avgGarnet').textContent = (sumG / TRIALS).toFixed(2);

@@ -34,7 +34,7 @@
           <span class="sub-hint">Max 3 copies per card</span>
         </div>
         <div class="search-bar">
-          <input type="text" id="searchInput" placeholder="Search any Yu-Gi-Oh! card name (e.g., Grapha, Snoww, Arianna, Ash Blossom)..." oninput="debounceSearch()">
+          <input type="text" id="searchInput" placeholder="Search any Yu-Gi-Oh! card name (e.g., Grapha, Snoww, Ceruli, Ash Blossom)..." oninput="debounceSearch()">
         </div>
         <div id="searchResults" class="search-results"></div>
       </div>
@@ -48,7 +48,8 @@
         <div class="legend">
           <span class="badge" style="background:var(--unassigned)">Unassigned</span>
           <span class="badge" style="background:var(--starter)">Starter (1-Card)</span>
-          <span class="badge" style="background:var(--combo-piece)">Combo Piece / Engine</span>
+          <span class="badge" style="background:var(--combo-a)">Combo Piece A (Outlet)</span>
+          <span class="badge" style="background:var(--combo-b)">Combo Piece B (Payoff)</span>
           <span class="badge" style="background:var(--extender)">Extender</span>
           <span class="badge" style="background:var(--handtrap)">Handtrap / Non-Engine</span>
           <span class="badge" style="background:var(--garnet)">Garnet / Brick</span>
@@ -86,11 +87,12 @@
         <div class="panel-title" style="margin-top: 12px; font-size: 0.9rem;">Average Opening Hand</div>
         <div class="avg-list">
           <div>Usable Starters: <strong id="avgStarter">0.00</strong></div>
-          <div>Combo Pieces: <strong id="avgComboPiece">0.00</strong></div>
+          <div>Combo Piece A: <strong id="avgComboA">0.00</strong></div>
+          <div>Combo Piece B: <strong id="avgComboB">0.00</strong></div>
           <div>Usable Extenders: <strong id="avgExtender">0.00</strong></div>
           <div>Usable Handtraps: <strong id="avgHandtrap">0.00</strong></div>
           <div>Garnets Drawn: <strong id="avgGarnet">0.00</strong></div>
-          <div>Dead HOPT Dups: <strong id="avgHoptDup" style="color:var(--garnet)">0.00</strong></div>
+          <div style="grid-column: span 2;">Dead HOPT Dups: <strong id="avgHoptDup" style="color:var(--garnet)">0.00</strong></div>
         </div>
       </div>
 
@@ -104,8 +106,12 @@
           <input type="number" id="reqStarters" value="0" min="0" max="6" onchange="runSimulation()">
         </div>
         <div class="req-row">
-          <span>Min Combo Pieces:</span>
-          <input type="number" id="reqComboPieces" value="0" min="0" max="6" onchange="runSimulation()">
+          <span>Min Combo Piece A:</span>
+          <input type="number" id="reqComboA" value="0" min="0" max="6" onchange="runSimulation()">
+        </div>
+        <div class="req-row">
+          <span>Min Combo Piece B:</span>
+          <input type="number" id="reqComboB" value="0" min="0" max="6" onchange="runSimulation()">
         </div>
         <div class="req-row">
           <span>Min Usable Extenders:</span>
@@ -139,7 +145,7 @@
           <button onclick="addComboRow()">+ Add Combo</button>
         </div>
         <p class="sub-hint" style="margin-bottom: 10px;">
-          Pair your <strong>Combo Pieces</strong> with Starters, Extenders, or specific cards. Hands matching any combo below count as <strong>Playable</strong>.
+          Defaults to <strong>[Any Combo A] + [Any Combo B]</strong>. Hands matching any combo line below count as <strong>Playable</strong>.
         </p>
         <div id="comboList"></div>
       </div>

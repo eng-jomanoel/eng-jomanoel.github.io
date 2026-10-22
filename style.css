@@ -10,7 +10,8 @@
   /* Role Colors */
   --unassigned: #586e75;
   --starter: #2aa198;
-  --combo-piece: #b58900;
+  --combo-a: #b58900;
+  --combo-b: #cb4b16;
   --extender: #268bd2;
   --handtrap: #d33682;
   --garnet: #dc322f;
@@ -185,7 +186,8 @@ input[type="file"] { display: none; }
 
 .card-tile:hover { transform: translateY(-2px); }
 .card-tile[data-role="starter"] { border-color: var(--starter); }
-.card-tile[data-role="combo_piece"] { border-color: var(--combo-piece); }
+.card-tile[data-role="combo_a"] { border-color: var(--combo-a); }
+.card-tile[data-role="combo_b"] { border-color: var(--combo-b); }
 .card-tile[data-role="extender"] { border-color: var(--extender); }
 .card-tile[data-role="handtrap"] { border-color: var(--handtrap); }
 .card-tile[data-role="garnet"] { border-color: var(--garnet); }
@@ -213,7 +215,7 @@ input[type="file"] { display: none; }
 }
 
 .hopt-toggle.active {
-  background: var(--combo-piece);
+  background: var(--combo-a);
   color: #002b36;
   border-color: var(--text-bright);
 }
@@ -229,7 +231,8 @@ input[type="file"] { display: none; }
 }
 
 .card-tile[data-role="starter"] .role-banner { background: var(--starter); }
-.card-tile[data-role="combo_piece"] .role-banner { background: var(--combo-piece); }
+.card-tile[data-role="combo_a"] .role-banner { background: var(--combo-a); }
+.card-tile[data-role="combo_b"] .role-banner { background: var(--combo-b); }
 .card-tile[data-role="extender"] .role-banner { background: var(--extender); }
 .card-tile[data-role="handtrap"] .role-banner { background: var(--handtrap); }
 .card-tile[data-role="garnet"] .role-banner { background: var(--garnet); }
@@ -260,7 +263,7 @@ input[type="file"] { display: none; }
 }
 
 .stat-box.brick { border-left-color: var(--garnet); }
-.stat-box.target { border-left-color: var(--combo-piece); grid-column: span 2; }
+.stat-box.target { border-left-color: var(--combo-a); grid-column: span 2; }
 
 .stat-val { font-size: 1.4rem; font-weight: 700; color: var(--text-bright); }
 .stat-label { font-size: 0.74rem; color: var(--text-main); }
