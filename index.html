@@ -14,40 +14,44 @@
 </head>
 <body>
 
-  <div class="drop-overlay" id="dropOverlay" hidden>Drop your .ydk file to import it</div>
+  <div class="drop-overlay" id="dropOverlay" hidden data-i18n="drop.overlay"></div>
 
   <header class="topbar">
     <div class="brand">
-      <h1>YGO Deck Builder &amp; Probability Calculator</h1>
-      <p>Simulate your opening hands and see how consistent the deck really is.</p>
+      <h1 data-i18n="app.title">YGO Deck Builder &amp; Probability Calculator</h1>
+      <p data-i18n="app.subtitle"></p>
     </div>
 
     <div class="toolbar">
       <div class="tool-group">
-        <label class="btn file-btn">Import .YDK
+        <label class="btn file-btn"><span data-i18n="btn.import"></span>
           <input type="file" id="ydkInput" accept=".ydk,text/plain">
         </label>
-        <button type="button" class="btn" id="exportBtn">Export .YDK</button>
-        <button type="button" class="btn btn-accent" id="shareBtn">Copy share link</button>
+        <button type="button" class="btn" id="exportBtn" data-i18n="btn.export"></button>
+        <button type="button" class="btn btn-accent" id="shareBtn" data-i18n="btn.share"></button>
       </div>
 
       <div class="tool-group">
-        <select id="savedDecks" aria-label="Saved decks"></select>
-        <button type="button" class="btn" id="saveDeckBtn">Save deck</button>
-        <button type="button" class="btn btn-ghost-danger" id="deleteDeckBtn">Delete</button>
+        <select id="savedDecks" data-i18n-aria="aria.saved"></select>
+        <button type="button" class="btn" id="saveDeckBtn" data-i18n="btn.save"></button>
+        <button type="button" class="btn btn-ghost-danger" id="deleteDeckBtn" data-i18n="btn.delete"></button>
       </div>
 
       <div class="tool-group">
-        <select id="handSize" aria-label="Hand size">
-          <option value="5">Going 1st (5 cards)</option>
-          <option value="6">Going 2nd (6 cards)</option>
+        <select id="handSize" data-i18n-aria="aria.hand">
+          <option value="5" data-i18n="opt.first"></option>
+          <option value="6" data-i18n="opt.second"></option>
         </select>
-        <select id="trials" aria-label="Simulated hands">
-          <option value="50000">50k hands</option>
-          <option value="100000" selected>100k hands</option>
-          <option value="500000">500k hands</option>
+        <select id="trials" data-i18n-aria="aria.trials">
+          <option value="50000"></option>
+          <option value="100000" selected></option>
+          <option value="500000"></option>
         </select>
-        <button type="button" class="btn btn-danger" id="clearBtn">Clear deck</button>
+        <select id="langSelect" data-i18n-aria="aria.lang">
+          <option value="en">English</option>
+          <option value="pt">Português (Brasil)</option>
+        </select>
+        <button type="button" class="btn btn-danger" id="clearBtn" data-i18n="btn.clear"></button>
       </div>
     </div>
   </header>
@@ -58,33 +62,33 @@
 
     <!-- ============ LEFT: deck views ============ -->
     <main class="main-col">
-      <nav class="tabs" role="tablist" aria-label="Deck views">
-        <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="grid">Deck grid</button>
-        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="table">Role table</button>
-        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="siding">Siding</button>
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="grid" data-i18n="tab.grid"></button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="table" data-i18n="tab.table"></button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="siding" data-i18n="tab.siding"></button>
       </nav>
 
       <!-- ---- Deck grid ---- -->
       <section id="tab-grid" class="tab-pane" role="tabpanel">
         <div class="panel">
           <div class="panel-head">
-            <h2>Add cards</h2>
-            <label class="inline-field">Add to
+            <h2 data-i18n="add.title"></h2>
+            <label class="inline-field"><span data-i18n="add.to"></span>
               <select id="addTo">
-                <option value="auto">Main / Extra (automatic)</option>
-                <option value="side">Side deck</option>
+                <option value="auto" data-i18n="add.auto"></option>
+                <option value="side" data-i18n="add.side"></option>
               </select>
             </label>
           </div>
-          <input type="search" id="searchInput" class="search-input" placeholder="Search by card name, or paste a card ID" autocomplete="off" spellcheck="false">
+          <input type="search" id="searchInput" class="search-input" data-i18n-ph="search.ph" autocomplete="off" spellcheck="false">
           <p class="hint" id="searchStatus" aria-live="polite"></p>
           <div id="searchResults" class="search-results"></div>
         </div>
 
         <div class="panel">
           <div class="panel-head">
-            <h2>Main deck <span class="chip" id="mainCount">0</span></h2>
-            <button type="button" class="btn btn-small" id="resetRolesBtn">Reset roles</button>
+            <h2><span data-i18n="deck.main"></span> <span class="chip" id="mainCount">0</span></h2>
+            <button type="button" class="btn btn-small" id="resetRolesBtn" data-i18n="btn.resetRoles"></button>
           </div>
           <div class="brush-row">
             <div class="legend" id="legend"></div>
@@ -94,12 +98,12 @@
         </div>
 
         <div class="panel">
-          <div class="panel-head"><h2>Extra deck <span class="chip" id="extraCount">0</span></h2></div>
+          <div class="panel-head"><h2><span data-i18n="deck.extra"></span> <span class="chip" id="extraCount">0</span></h2></div>
           <div id="extraGrid" class="card-grid"></div>
         </div>
 
         <div class="panel">
-          <div class="panel-head"><h2>Side deck <span class="chip" id="sideCount">0</span></h2></div>
+          <div class="panel-head"><h2><span data-i18n="deck.side"></span> <span class="chip" id="sideCount">0</span></h2></div>
           <div id="sideGrid" class="card-grid"></div>
         </div>
       </section>
@@ -108,17 +112,23 @@
       <section id="tab-table" class="tab-pane" role="tabpanel" hidden>
         <div class="panel">
           <div class="panel-head">
-            <h2>Roles and HOPT <span class="chip" id="tableCount">0 cards</span></h2>
+            <h2><span data-i18n="table.title"></span> <span class="chip" id="tableCount">0</span></h2>
           </div>
           <div class="table-tools">
-            <input type="search" id="tableFilter" class="search-input" placeholder="Filter by name" autocomplete="off">
-            <label class="check"><input type="checkbox" id="onlyUnassigned"> <span>Only unassigned</span></label>
+            <input type="search" id="tableFilter" class="search-input" data-i18n-ph="filter.ph" autocomplete="off">
+            <label class="check"><input type="checkbox" id="onlyUnassigned"> <span data-i18n="only.unassigned"></span></label>
           </div>
-          <p class="hint">Extra deck cards don't need a role, so they're not listed here.</p>
+          <p class="hint" data-i18n="table.hint"></p>
+          <p class="hint" data-i18n="table.hint2"></p>
           <div class="table-wrap">
             <table class="role-table">
               <thead>
-                <tr><th>Card</th><th>Copies</th><th>Role</th><th>HOPT</th></tr>
+                <tr>
+                  <th data-i18n="th.card"></th>
+                  <th data-i18n="th.copies"></th>
+                  <th data-i18n="th.role"></th>
+                  <th data-i18n="th.uses"></th>
+                </tr>
               </thead>
               <tbody id="roleTableBody"></tbody>
             </table>
@@ -130,18 +140,18 @@
       <section id="tab-siding" class="tab-pane" role="tabpanel" hidden>
         <div class="panel">
           <div class="panel-head">
-            <h2>Siding simulator</h2>
-            <button type="button" class="btn btn-ghost-danger btn-small" id="resetSidingBtn">Reset siding</button>
+            <h2 data-i18n="siding.title"></h2>
+            <button type="button" class="btn btn-ghost-danger btn-small" id="resetSidingBtn" data-i18n="btn.resetSiding"></button>
           </div>
-          <p class="hint">Click a card to swap it between main and side. The results panel compares the sided deck against your original list.</p>
+          <p class="hint" data-i18n="siding.hint"></p>
           <p class="hint" id="sidingSummary"></p>
           <div class="siding-cols">
             <div class="siding-col">
-              <h3>Main deck <span class="chip" id="sideMainCount">0</span></h3>
+              <h3><span data-i18n="deck.main"></span> <span class="chip" id="sideMainCount">0</span></h3>
               <div id="sidingMainList" class="card-grid small"></div>
             </div>
             <div class="siding-col">
-              <h3>Side deck <span class="chip" id="sideSideCount">0</span></h3>
+              <h3><span data-i18n="deck.side"></span> <span class="chip" id="sideSideCount">0</span></h3>
               <div id="sidingSideList" class="card-grid small"></div>
             </div>
           </div>
@@ -149,14 +159,14 @@
       </section>
 
       <details class="panel help">
-        <summary>How this works</summary>
+        <summary data-i18n="help.summary"></summary>
         <div class="help-body">
-          <p><strong>Roles.</strong> Give each main or side deck card a role. A <em>Starter</em> can get your play going alone. <em>Combo A</em> and <em>Combo B</em> are pieces that only work together. An <em>Extender</em> needs a starter first. A <em>Handtrap</em> is interaction you want in hand. A <em>Garnet</em> is a card you never want to draw.</p>
-          <p><strong>Fast assigning.</strong> Pick a role in the legend to use it as a brush, then click cards to paint them. With no brush selected, clicking a card cycles through the roles.</p>
-          <p><strong>HOPT.</strong> If a card is hard once per turn, a second copy in the same hand is dead: it doesn't count as a starter, extender or combo piece.</p>
-          <p><strong>Playable and brick.</strong> A hand is playable with at least one starter, or when any combo line matches. It's a brick when it isn't playable, or when it holds as many garnets as your brick limit.</p>
-          <p><strong>Simulation.</strong> The calculator shuffles your main deck and draws a hand for every simulated trial. The random seed is fixed so the same deck always shows the same numbers. Press the reroll button to see how much the result moves.</p>
-          <p><strong>Saving.</strong> Your deck, roles and combos save automatically in this browser. Roles are remembered per card, so cards you already tagged keep their role in other decks. Use "Copy share link" to send your deck with roles and combos to a friend.</p>
+          <p data-i18n-html="help.1"></p>
+          <p data-i18n-html="help.2"></p>
+          <p data-i18n-html="help.3"></p>
+          <p data-i18n-html="help.4"></p>
+          <p data-i18n-html="help.5"></p>
+          <p data-i18n-html="help.6"></p>
         </div>
       </details>
     </main>
@@ -165,9 +175,9 @@
     <aside class="sidebar">
       <div class="panel">
         <div class="panel-head">
-          <h2>Results</h2>
+          <h2 data-i18n="results.title"></h2>
           <span class="sim-meta"><span id="simSpeed">0 ms</span>
-            <button type="button" class="btn btn-small btn-icon" id="rerollBtn" title="Run again with a new random seed" aria-label="Reroll simulation">&#8635;</button>
+            <button type="button" class="btn btn-small btn-icon" id="rerollBtn" data-i18n-title="results.reroll" data-i18n-aria="results.reroll">&#8635;</button>
           </span>
         </div>
         <p class="hint" id="simNote"></p>
@@ -175,75 +185,70 @@
         <div class="stat-grid">
           <div class="stat good">
             <div class="stat-val"><span id="playableRate">0.0%</span><span class="delta" id="playableDelta"></span></div>
-            <div class="stat-label">Playable (starter or combo)</div>
+            <div class="stat-label" data-i18n="stat.playable"></div>
           </div>
           <div class="stat bad">
             <div class="stat-val"><span id="brickRate">0.0%</span><span class="delta" id="brickDelta"></span></div>
-            <div class="stat-label">Brick</div>
+            <div class="stat-label" data-i18n="stat.brick"></div>
           </div>
           <div class="stat gold wide">
             <div class="stat-val"><span id="targetRate">0.0%</span><span class="delta" id="targetDelta"></span></div>
-            <div class="stat-label">Meets your hand goal</div>
+            <div class="stat-label" data-i18n="stat.goal"></div>
           </div>
         </div>
 
-        <h3 class="sub-title">Average opening hand</h3>
+        <h3 class="sub-title" data-i18n="avg.title"></h3>
         <div class="avg-table" id="avgList"></div>
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h2>Hand goal</h2></div>
+        <div class="panel-head"><h2 data-i18n="goal.title"></h2></div>
         <div class="crit-grid">
-          <label>Min starters <input type="number" data-crit="starters" min="0" max="6" value="0"></label>
-          <label>Min combo A <input type="number" data-crit="comboA" min="0" max="6" value="0"></label>
-          <label>Min combo B <input type="number" data-crit="comboB" min="0" max="6" value="0"></label>
-          <label>Min extenders <input type="number" data-crit="extenders" min="0" max="6" value="0"></label>
-          <label>Min handtraps <input type="number" data-crit="handtraps" min="0" max="6" value="0"></label>
-          <label>Max garnets <input type="number" data-crit="maxGarnets" min="0" max="6" value="6"></label>
+          <label><span data-i18n="goal.starters"></span> <input type="number" data-crit="starters" min="0" max="6" value="0"></label>
+          <label><span data-i18n="goal.comboA"></span> <input type="number" data-crit="comboA" min="0" max="6" value="0"></label>
+          <label><span data-i18n="goal.comboB"></span> <input type="number" data-crit="comboB" min="0" max="6" value="0"></label>
+          <label><span data-i18n="goal.extenders"></span> <input type="number" data-crit="extenders" min="0" max="6" value="0"></label>
+          <label><span data-i18n="goal.handtraps"></span> <input type="number" data-crit="handtraps" min="0" max="6" value="0"></label>
+          <label><span data-i18n="goal.maxBricks"></span> <input type="number" data-crit="maxBricks" min="0" max="6" value="0"></label>
         </div>
         <div class="crit-specific">
-          <label>Must draw
-            <select id="critSpecific" data-crit="specific"><option value="">Any card</option></select>
+          <label><span data-i18n="goal.mustDraw"></span>
+            <select id="critSpecific" data-crit="specific"><option value=""></option></select>
           </label>
-          <label>Copies <input type="number" data-crit="specificQty" min="1" max="3" value="1"></label>
+          <label><span data-i18n="goal.copies"></span> <input type="number" data-crit="specificQty" min="1" max="3" value="1"></label>
         </div>
-        <label class="crit-brick">Count as brick at
-          <input type="number" data-crit="brickGarnets" min="1" max="6" value="2"> garnets
-        </label>
       </div>
 
       <div class="panel">
         <div class="panel-head">
-          <h2>Combo lines</h2>
-          <button type="button" class="btn btn-small" id="addComboBtn">Add combo</button>
+          <h2 data-i18n="combo.title"></h2>
+          <button type="button" class="btn btn-small" id="addComboBtn" data-i18n="btn.addCombo"></button>
         </div>
-        <p class="hint">A hand that matches any line counts as playable. Each line needs every card or role you pick, using different cards.</p>
+        <p class="hint" data-i18n="combo.hint"></p>
         <div id="comboList"></div>
       </div>
 
       <div class="panel">
         <div class="panel-head">
-          <h2>Test hand</h2>
-          <button type="button" class="btn btn-small btn-accent" id="drawHandBtn">Draw a hand</button>
+          <h2 data-i18n="hands.title"></h2>
+          <button type="button" class="btn btn-small btn-accent" id="drawHandBtn" data-i18n="btn.draw"></button>
         </div>
         <div id="testHand" class="hand"></div>
-        <p class="hint" id="testHandVerdict">Draw a random hand from the deck as it stands now.</p>
+        <p class="hint" id="testHandVerdict"></p>
 
-        <h3 class="sub-title">Best hand found <span class="sim-meta" id="bestHandScore"></span></h3>
+        <h3 class="sub-title"><span data-i18n="hands.best"></span> <span class="sim-meta" id="bestHandScore"></span></h3>
         <div id="bestHand" class="hand"></div>
+        <p class="hint" id="bestHandHint"></p>
       </div>
     </aside>
   </div>
 
-  <footer class="footer">
-    Card data and images come from <a href="https://ygoprodeck.com/" target="_blank" rel="noopener">YGOPRODeck</a>.
-    Yu-Gi-Oh! is a trademark of Konami. This is a fan project and isn't affiliated with Konami.
-  </footer>
+  <footer class="footer" data-i18n-html="footer"></footer>
 
   <div class="mini-bar" id="miniBar" aria-hidden="true">
-    <span><b id="miniPlayable">0.0%</b> playable</span>
-    <span><b id="miniBrick">0.0%</b> brick</span>
-    <span><b id="miniTarget">0.0%</b> goal</span>
+    <span><b id="miniPlayable">0.0%</b> <span data-i18n="mini.playable"></span></span>
+    <span><b id="miniBrick">0.0%</b> <span data-i18n="mini.brick"></span></span>
+    <span><b id="miniTarget">0.0%</b> <span data-i18n="mini.goal"></span></span>
   </div>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>

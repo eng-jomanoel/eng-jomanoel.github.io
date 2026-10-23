@@ -241,6 +241,7 @@ input::placeholder { color: var(--muted); }
 }
 .search-item:hover { border-color: var(--accent); }
 .search-item .name { display: block; font-size: .68rem; padding: 3px 4px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-item .name2 { display: block; font-size: .62rem; color: var(--muted); padding: 0 4px 4px; margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-item .own {
   position: absolute; top: 4px; right: 4px; z-index: 2;
   background: var(--accent); color: var(--accent-ink);
@@ -292,13 +293,6 @@ input::placeholder { color: var(--muted); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--bright);
 }
 
-.tile .chip.hopt {
-  position: absolute; top: 4px; right: 4px; z-index: 2; cursor: pointer;
-  font-size: .62rem; padding: 1px 5px; border-radius: 4px;
-  background: rgba(3, 12, 16, .88); color: var(--muted); border: 1px solid var(--muted);
-}
-.tile .chip.hopt.on { background: var(--brass); color: #1d1503; border-color: #f7e2b0; }
-
 .tile .rm {
   position: absolute; top: 4px; left: 4px; z-index: 2;
   width: 20px; height: 20px; line-height: 18px; text-align: center;
@@ -338,10 +332,9 @@ input::placeholder { color: var(--muted); }
 .t-name strong { display: block; color: var(--bright); font-weight: 600; }
 .t-name small { color: var(--muted); font-size: .74rem; }
 .t-copies { color: var(--muted); white-space: nowrap; }
+.limit-select { width: 132px; }
 .role-select { width: 130px; border-left: 4px solid var(--rc, var(--r-unassigned)); }
 .empty-cell { text-align: center; color: var(--muted); padding: 26px; }
-.switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: .8rem; }
-.switch input { accent-color: var(--brass); width: 16px; height: 16px; }
 
 /* ---------- Siding ---------- */
 .siding-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
@@ -373,10 +366,8 @@ input::placeholder { color: var(--muted); }
 
 /* ---------- Criteria ---------- */
 .crit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
-.crit-grid label, .crit-specific label, .crit-brick { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .84rem; }
-.crit-specific { display: grid; grid-template-columns: 1fr auto; gap: 8px 14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.crit-grid label, .crit-specific label, .crit-specific { display: grid; grid-template-columns: 1fr auto; gap: 8px 14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .crit-specific select { max-width: 170px; }
-.crit-brick { margin-top: 10px; justify-content: flex-start; color: var(--muted); }
 
 /* ---------- Combos ---------- */
 .combo-row { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px; margin-top: 8px; }
